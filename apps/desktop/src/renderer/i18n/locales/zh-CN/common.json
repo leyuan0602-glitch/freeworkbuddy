@@ -10139,7 +10139,7 @@
       "installError": "未知错误"
     },
     "marketCard": {
-      "visibilityPublic": "XD.Inc",
+      "visibilityPublic": "公开",
       "visibilityDept": "团队",
       "visibilityPrivate": "个人",
       "timeLabel": "发布时间",
@@ -10175,7 +10175,7 @@
       "emptyHint": "这个云端 Skill 没有返回可预览文件"
     },
     "marketDetail": {
-      "visibilityPublic": "XD.Inc 可见",
+      "visibilityPublic": "所有用户可见",
       "visibilityPrivate": "个人可见",
       "visibilityDept": "团队可见",
       "files": "文件",
@@ -10230,7 +10230,7 @@
       "descriptionPlaceholder": "简要描述该 Skill 的用途",
       "visibilityLabel": "可见性",
       "visibilityPublicTitle": "公开",
-      "visibilityPublicDesc": "全公司可见 · 默认",
+      "visibilityPublicDesc": "所有用户可见 · 默认",
       "versionLabel": "版本号",
       "versionFormatHint": "格式：x.y.z (例如 1.0.1)",
       "categoryLabel": "分类",
@@ -10442,7 +10442,7 @@
       "title": "管理可见性",
       "tierLabel": "可见性",
       "tierPublic": "公开",
-      "tierPublicDesc": "全公司可见",
+      "tierPublicDesc": "所有用户可见",
       "tierTeam": "给团队使用",
       "tierTeamDesc": "指定团队可见",
       "tierPrivate": "仅自己使用",

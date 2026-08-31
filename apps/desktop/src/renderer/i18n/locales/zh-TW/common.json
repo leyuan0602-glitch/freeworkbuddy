@@ -10139,7 +10139,7 @@
       "installError": "未知錯誤"
     },
     "marketCard": {
-      "visibilityPublic": "XD.Inc",
+      "visibilityPublic": "公開",
       "visibilityDept": "團隊",
       "visibilityPrivate": "個人",
       "timeLabel": "釋出時間",
@@ -10175,7 +10175,7 @@
       "emptyHint": "這個雲端 Skill 沒有返回可預覽檔案"
     },
     "marketDetail": {
-      "visibilityPublic": "XD.Inc 可見",
+      "visibilityPublic": "所有使用者可見",
       "visibilityPrivate": "個人可見",
       "visibilityDept": "團隊可見",
       "files": "檔案",
@@ -10230,7 +10230,7 @@
       "descriptionPlaceholder": "簡要描述該 Skill 的用途",
       "visibilityLabel": "可見性",
       "visibilityPublicTitle": "公開",
-      "visibilityPublicDesc": "全公司可見 · 預設",
+      "visibilityPublicDesc": "所有使用者可見 · 預設",
       "versionLabel": "版本號",
       "versionFormatHint": "格式：x.y.z (例如 1.0.1)",
       "categoryLabel": "分類",
@@ -10442,7 +10442,7 @@
       "title": "管理可見性",
       "tierLabel": "可見性",
       "tierPublic": "公開",
-      "tierPublicDesc": "全公司可見",
+      "tierPublicDesc": "所有使用者可見",
       "tierTeam": "給團隊使用",
       "tierTeamDesc": "指定團隊可見",
       "tierPrivate": "僅自己使用",

@@ -10147,7 +10147,7 @@
       "installError": "알 수 없는 오류"
     },
     "marketCard": {
-      "visibilityPublic": "XD.Inc",
+      "visibilityPublic": "공개",
       "visibilityDept": "팀",
       "visibilityPrivate": "개인",
       "timeLabel": "게시 시간",
@@ -10183,7 +10183,7 @@
       "emptyHint": "이 클라우드 Skill 에서 미리 볼 수 있는 파일을 반환하지 않았습니다"
     },
     "marketDetail": {
-      "visibilityPublic": "XD.Inc 에 공개",
+      "visibilityPublic": "모든 사용자에게 공개",
       "visibilityPrivate": "개인 공개",
       "visibilityDept": "팀 공개",
       "files": "파일",
@@ -10238,7 +10238,7 @@
       "descriptionPlaceholder": "이 skill 의 용도를 간단히 설명",
       "visibilityLabel": "가시성",
       "visibilityPublicTitle": "공개",
-      "visibilityPublicDesc": "회사 전체 공개 · 기본값",
+      "visibilityPublicDesc": "모든 사용자에게 공개 · 기본값",
       "versionLabel": "버전",
       "versionFormatHint": "형식: x.y.z (예: 1.0.1)",
       "categoryLabel": "분류",
@@ -10450,7 +10450,7 @@
       "title": "공개 설정 관리",
       "tierLabel": "가시성",
       "tierPublic": "공개",
-      "tierPublicDesc": "회사 전체 공개",
+      "tierPublicDesc": "모든 사용자에게 공개",
       "tierTeam": "팀",
       "tierTeamDesc": "지정한 팀에 공개",
       "tierPrivate": "나만 사용",

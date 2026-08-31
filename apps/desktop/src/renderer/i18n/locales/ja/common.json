@@ -10147,7 +10147,7 @@
       "installError": "不明なエラー"
     },
     "marketCard": {
-      "visibilityPublic": "XD.Inc",
+      "visibilityPublic": "公開",
       "visibilityDept": "チーム",
       "visibilityPrivate": "個人",
       "timeLabel": "公開日時",
@@ -10183,7 +10183,7 @@
       "emptyHint": "このクラウド Skill からプレビュー可能なファイルが返されませんでした"
     },
     "marketDetail": {
-      "visibilityPublic": "XD.Inc に公開",
+      "visibilityPublic": "すべてのユーザーに公開",
       "visibilityPrivate": "個人のみ",
       "visibilityDept": "チームに公開",
       "files": "ファイル",
@@ -10238,7 +10238,7 @@
       "descriptionPlaceholder": "この skill の用途を簡潔に",
       "visibilityLabel": "可視性",
       "visibilityPublicTitle": "公開",
-      "visibilityPublicDesc": "全社に公開 · デフォルト",
+      "visibilityPublicDesc": "すべてのユーザーに公開 · デフォルト",
       "versionLabel": "バージョン",
       "versionFormatHint": "形式：x.y.z（例：1.0.1）",
       "categoryLabel": "カテゴリ",
@@ -10450,7 +10450,7 @@
       "title": "公開設定を管理",
       "tierLabel": "可視性",
       "tierPublic": "公開",
-      "tierPublicDesc": "全社に公開",
+      "tierPublicDesc": "すべてのユーザーに公開",
       "tierTeam": "チーム",
       "tierTeamDesc": "指定したチームに公開",
       "tierPrivate": "自分のみ",

@@ -10169,7 +10169,7 @@
       "installError": "Unknown error"
     },
     "marketCard": {
-      "visibilityPublic": "XD.Inc",
+      "visibilityPublic": "Public",
       "visibilityDept": "Team",
       "visibilityPrivate": "Personal",
       "timeLabel": "Published time",
@@ -10205,7 +10205,7 @@
       "emptyHint": "This cloud Skill did not return previewable files"
     },
     "marketDetail": {
-      "visibilityPublic": "Visible to XD.Inc",
+      "visibilityPublic": "Visible to all users",
       "visibilityPrivate": "Personal",
       "visibilityDept": "Team visible",
       "files": "Files",
@@ -10260,7 +10260,7 @@
       "descriptionPlaceholder": "Briefly describe this skill",
       "visibilityLabel": "Visibility",
       "visibilityPublicTitle": "Public",
-      "visibilityPublicDesc": "Visible to the whole company · Default",
+      "visibilityPublicDesc": "Visible to all users · Default",
       "versionLabel": "Version",
       "versionFormatHint": "Format: x.y.z (e.g. 1.0.1)",
       "categoryLabel": "Category",
@@ -10472,7 +10472,7 @@
       "title": "Manage visibility",
       "tierLabel": "Visibility",
       "tierPublic": "Public",
-      "tierPublicDesc": "Visible to the whole company",
+      "tierPublicDesc": "Visible to all users",
       "tierTeam": "Team",
       "tierTeamDesc": "Visible to selected teams",
       "tierPrivate": "Only me",
