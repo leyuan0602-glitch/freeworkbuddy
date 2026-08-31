@@ -1,5 +1,6 @@
 export interface HubSkillInfoForDesktop {
   slug: string;
+  icon?: string;
   displayName?: string;
   summary?: string | null;
   description?: string;
@@ -17,6 +18,8 @@ export interface HubSkillInfoForDesktop {
   updatedAt: string;
   isMine?: boolean;
   categories?: Array<{ slug: string; name: string }>;
+  tags?: Array<{ slug: string; name: string }>;
+  githubUrl?: string;
   stats?: {
     downloads?: number;
   };
@@ -29,6 +32,7 @@ interface MapOptions {
 export function mapHubSkillInfoToDesktopInfo(hub: HubSkillInfoForDesktop, opts?: MapOptions) {
   return {
     name: hub.slug,
+    icon: hub.icon,
     displayName: hub.displayName ?? hub.slug,
     description: hub.summary ?? hub.description ?? '',
     authorId: hub.owner.slug,
@@ -47,6 +51,8 @@ export function mapHubSkillInfoToDesktopInfo(hub: HubSkillInfoForDesktop, opts?:
     pendingVersion: hub.pendingVersion,
     visibleDeptIds: [] as string[],
     categories: (hub.categories ?? []).map((category) => category.slug),
+    tags: (hub.tags ?? hub.categories ?? []).map((tag) => ({ slug: tag.slug, name: tag.name })),
+    githubUrl: hub.githubUrl,
     publishedAt: hub.updatedAt,
     downloads: Number.isFinite(hub.stats?.downloads) ? hub.stats?.downloads ?? 0 : 0,
     latestPublishedFromDeviceId: null as string | null,

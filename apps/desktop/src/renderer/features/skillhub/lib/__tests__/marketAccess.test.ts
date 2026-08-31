@@ -10,6 +10,7 @@ function user(
   }> = {},
 ) {
   return {
+    id: 'membership-1',
     membershipKind: 'org' as const,
     orgName: null,
     orgSlug: null,
@@ -18,30 +19,17 @@ function user(
 }
 
 describe('canAccessSkillhubMarket', () => {
-  it('allows xd org members by orgSlug', () => {
+  it('allows personal accounts', () => {
+    expect(canAccessSkillhubMarket(user({ membershipKind: 'personal' }))).toBe(true);
+  });
+
+  it('allows every organization without inspecting its slug or display name', () => {
     expect(canAccessSkillhubMarket(user({ orgSlug: 'xd', orgName: '心动' }))).toBe(true);
+    expect(canAccessSkillhubMarket(user({ orgSlug: 'disco-corp', orgName: 'Disco Corp' }))).toBe(true);
+    expect(canAccessSkillhubMarket(user({ orgSlug: null, orgName: null }))).toBe(true);
   });
 
-  it('denies non-xd org slugs regardless of display name', () => {
-    expect(canAccessSkillhubMarket(user({ orgSlug: 'disco-corp', orgName: 'xd' }))).toBe(false);
-    // slug 只做全等匹配,不做包含匹配
-    expect(canAccessSkillhubMarket(user({ orgSlug: 'xd-partner' }))).toBe(false);
-  });
-
-  it('falls back to orgName equality only when orgSlug claim is missing', () => {
-    expect(canAccessSkillhubMarket(user({ orgSlug: null, orgName: 'xd' }))).toBe(true);
-    expect(canAccessSkillhubMarket(user({ orgSlug: null, orgName: ' XD ' }))).toBe(true);
-    expect(canAccessSkillhubMarket(user({ orgSlug: null, orgName: 'Disco Corp' }))).toBe(false);
-    expect(canAccessSkillhubMarket(user({ orgSlug: null, orgName: null }))).toBe(false);
-  });
-
-  it('denies personal accounts even with stale org fields (fail-closed)', () => {
-    expect(
-      canAccessSkillhubMarket(user({ membershipKind: 'personal', orgSlug: 'xd', orgName: 'xd' })),
-    ).toBe(false);
-  });
-
-  it('denies missing login state (fail-closed)', () => {
+  it('does not request cloud data without a logged-in Cindy account', () => {
     expect(canAccessSkillhubMarket(null)).toBe(false);
   });
 });

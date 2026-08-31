@@ -75,9 +75,9 @@ function FilterChip({
 }
 
 /**
- * 市场路由门禁包装:市场不可见的账号(个人 / 非 xd 组织,见 lib/marketAccess.ts)
- * 通过深链 / 历史记录直达 /skillhub/market 时,重定向回本地技能首页。
- * 登录态初始化期间(user 尚未水合)不误判,先按原样渲染。
+ * 未登录 / 本地模式没有 SkillHub 云端凭证，深链返回本地技能首页。
+ * 登录后不再做组织白名单判断；Skill 数据的可见范围由服务端决定。
+ * 登录态初始化期间(user 尚未水合)不误判，先按原样渲染。
  */
 export function SkillhubMarketListView() {
   const { user, isInitializing } = useAuth();

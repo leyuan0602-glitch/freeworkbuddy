@@ -69,8 +69,8 @@ export function SkillhubHomeView({
   const [query, setQuery] = useState('');
   const normalizedQuery = query.trim().toLocaleLowerCase();
 
-  // 市场可见性门禁:仅 xd 组织的企业账号可见 Skill Hub 入口与推荐安装;
-  // 其它账号(个人 / 非 xd 组织 / 未登录)只显示本地技能,且不发市场请求。
+  // 登录后所有账号都请求 SkillHub;数据可见范围由服务端按已验证身份决定。
+  // 未登录 / 本地模式没有云端凭证,只显示本地技能。
   const { user } = useAuth();
   const marketAllowed = canAccessSkillhubMarket(user);
 

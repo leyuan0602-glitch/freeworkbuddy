@@ -53,6 +53,8 @@ export type MarketCardState =
 export interface MarketSkill {
   /** 服务端主键 = name,前端 list key 用它。 */
   name: string;
+  /** Skill 图标 URL；旧服务响应缺失时保持 undefined。 */
+  icon?: string;
   displayName: string;
   description: string;
   authorName: string;
@@ -95,6 +97,7 @@ export interface MarketSkill {
 
 interface ServerListItem {
   name: string;
+  icon?: string;
   displayName: string;
   description: string;
   authorId: string;
@@ -204,6 +207,7 @@ function mapServerToView(
   );
   return {
     name: item.name,
+    icon: item.icon,
     displayName: item.displayName,
     description: item.description,
     authorName: item.authorName,
@@ -264,7 +268,7 @@ export function useMarketList(
   options?: {
     /**
      * false 时完全不发市场请求(items 保持空、loading 保持 false)。
-     * 供市场不可见的账号(见 lib/marketAccess.ts)跳过网络与骨架屏;翻回 true 后自动补拉。
+     * 供未登录 / 本地模式跳过云端请求与骨架屏；登录后自动补拉。
      */
     enabled?: boolean;
   },

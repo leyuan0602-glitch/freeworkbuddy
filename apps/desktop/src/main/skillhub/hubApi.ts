@@ -1,6 +1,7 @@
 /**
  * skillhub 业务的统一 server API 入口:所有 /api/skills-hub/* 调用固定打
- * 独立部署的 skillhub-server(clientEndpoints 'skillhubApiBaseUrl';老主
+ * 独立部署的 cindy-skill-hub-server(clientEndpoints
+ * 'cindySkillHubApiBaseUrl';旧 'skillhubApiBaseUrl' 永久保留给已发布客户端;老主
  * server 的 apiBaseUrl 已随 2026-07 收敛退役)。serverApiFetch 的 Bearer
  * 注入与 401 自动刷新链路不变。
  * getClientEndpoint 每次调用时惰性求值——端点清单在 app.ready 内解析,
@@ -17,7 +18,9 @@ export function skillhubApiFetch<T>(
   requireAppCapability('canUseSkillHubCloud', 'SkillHub cloud requires a Cindy account.');
   return serverApiFetch<T>(apiPath, {
     ...opts,
-    baseUrl: () => getClientEndpoint('skillhubApiBaseUrl'),
+    // 新客户端绝不回退旧 skillhubApiBaseUrl：XD 身份的只读兼容由新服务自己
+    // 路由，回退会让个人/其它组织误连只面向 XD 的旧服务。
+    baseUrl: () => getClientEndpoint('cindySkillHubApiBaseUrl'),
     // skills-hub 的 path 都带用户/第三方 skill 身份(`/api/skills-hub/skills/<name>[/download]`),
     // 4xx/5xx 落进 serverApiClient 的 not_ok 日志会外泄它。用不含身份的路由模板代替真实 path,
     // 并借此在日志里连 msg 一起省掉(2026-08-06 review)。这里**不**设 redactErrorDetails:SkillHub
