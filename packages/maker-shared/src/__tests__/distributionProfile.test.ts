@@ -92,7 +92,7 @@ describe('official profiles(官方三身份回归)', () => {
   });
 
   it('官方 capability 默认全开,键集与蓝图 taxonomy 一致', () => {
-    expect(DISTRIBUTION_CAPABILITY_KEYS).toHaveLength(16);
+    expect(DISTRIBUTION_CAPABILITY_KEYS).toHaveLength(17);
     for (const region of ['cn', 'global', 'dev'] as const) {
       const defaults = OFFICIAL_DISTRIBUTION_PROFILES[region].capabilityDefaults;
       for (const key of DISTRIBUTION_CAPABILITY_KEYS) {

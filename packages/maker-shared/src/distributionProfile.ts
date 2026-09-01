@@ -134,7 +134,8 @@ export type DistributionCapabilityKey =
   | 'canPublishPlugins'
   | 'canSendHeartbeat'
   | 'canCheckDesktopUpdates'
-  | 'canOpenWebsite';
+  | 'canOpenWebsite'
+  | 'canSendTelemetry';
 
 export const DISTRIBUTION_CAPABILITY_KEYS: readonly DistributionCapabilityKey[] = Object.freeze([
   'canUseAccount',
@@ -153,6 +154,7 @@ export const DISTRIBUTION_CAPABILITY_KEYS: readonly DistributionCapabilityKey[] 
   'canSendHeartbeat',
   'canCheckDesktopUpdates',
   'canOpenWebsite',
+  'canSendTelemetry',
 ]);
 
 /**
@@ -227,14 +229,18 @@ function officialSecureStorageNamespace(region: CindyRegion): string {
   return region === 'dev' ? 'cindydev' : 'cindy';
 }
 
-/** 官方 profile 的 capability 默认值:全能力开启(现有官方行为)。 */
-const OFFICIAL_CAPABILITY_DEFAULTS: Readonly<Record<DistributionCapabilityKey, boolean>> =
-  Object.freeze(
-    Object.fromEntries(DISTRIBUTION_CAPABILITY_KEYS.map((k) => [k, true])) as Record<
-      DistributionCapabilityKey,
-      boolean
-    >,
+/**
+ * 官方 profile 的 capability 默认值:业务能力全开(现有官方行为);
+ * telemetry 跟随 telemetryPolicy(official → 开)。
+ */
+function officialCapabilityDefaults(): Readonly<Record<DistributionCapabilityKey, boolean>> {
+  // official telemetryPolicy → canSendTelemetry 为 true;其余能力全开。
+  return Object.freeze(
+    Object.fromEntries(
+      DISTRIBUTION_CAPABILITY_KEYS.map((k) => [k, true]),
+    ) as Record<DistributionCapabilityKey, boolean>,
   );
+}
 
 /**
  * 按官方区域派生 profile。全部身份字段引用 BRAND_IDENTITY,不复制字面量;
@@ -272,7 +278,7 @@ export function officialProfileForRegion(region: CindyRegion): DistributionProfi
       mode: 'remote',
       trustedEndpointDomains: OFFICIAL_TRUSTED_ENDPOINT_DOMAINS,
     }),
-    capabilityDefaults: OFFICIAL_CAPABILITY_DEFAULTS,
+    capabilityDefaults: officialCapabilityDefaults(),
     telemetryPolicy: 'official',
     updateMode: 'official',
   });

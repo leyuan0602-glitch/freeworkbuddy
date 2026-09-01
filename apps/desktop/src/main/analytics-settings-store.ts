@@ -20,6 +20,7 @@ import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { CURRENT_DISTRIBUTION_CAPABILITY_DEFAULTS } from '../shared/brandRegion.js';
 import { desktopMakerLogger } from './maker-host/logger-adapter.js';
 import {
   createOverrideSettingsFile,
@@ -270,6 +271,10 @@ function isReportingBuild(): boolean {
  */
 export function isAnalyticsAllowed(): boolean {
   probeRecordOnce();
+  // 发行闸(工作流 C):telemetryPolicy=disabled 的发行(独立发行)在最前关断,
+  // 不进同意/开关判定 —— 未部署的采集面连 consent UI 状态都不消费。
+  const distributionDefaults = CURRENT_DISTRIBUTION_CAPABILITY_DEFAULTS;
+  if (distributionDefaults && distributionDefaults.canSendTelemetry === false) return false;
   if (!isReportingBuild()) return false;
   const value = store.read();
   return value.privacyConsentAccepted && value.analyticsEnabled;
