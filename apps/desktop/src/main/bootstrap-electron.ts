@@ -880,7 +880,7 @@ import {
 } from './model-access/index.js';
 import { effectiveXdGatewayBaseUrl } from './model-access/effectiveEndpoint.js';
 import { isLocalDbOwnerCurrent } from './appSessionPolicy.js';
-import { getAppCapabilities, registerAppCapabilitiesIpc, requireAppCapability } from './appCapabilities.js';
+import { getAppCapabilities, installCapabilitySnapshotBroadcaster, registerAppCapabilitiesIpc, requireAppCapability } from './appCapabilities.js';
 import { installNoEgressAudit, isNoEgressAuditRequested, scheduleNoEgressAuditQuit } from './noEgressAudit.js';
 import {
   activeOwnerScopeKey,
@@ -8645,6 +8645,9 @@ void app.whenReady().then(async () => {
   // handler 还没注册的话那次 invoke 会 reject,而它是 fail closed 的 —— 已同意
   // 的用户会一直不上报,直到手动去设置里拨一下开关。
   initAnalyticsSettingsService();
+  // capability 快照广播器(工作流 E):订阅 auth 状态变化,登录/登出后向全部
+  // 窗口推送最新 capability 投影(renderer 首帧值由 sendSync 提供,后续靠本推送)。
+  installCapabilitySnapshotBroadcaster();
   // 日志上报:同样必须在 createWindow 之前注册 —— 设置页一挂载就 invoke
   // log-upload:settings-get 决定入口可用性;更重要的是崩溃即时路径要在
   // onFatalShutdown 上就位,否则 createWindow 之后立刻崩的那一次拿不到标记。

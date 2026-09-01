@@ -39,6 +39,11 @@ vi.mock('react-i18next', () => ({
 vi.mock('../../../../shared/brandRegion', () => ({
   CURRENT_CINDY_REGION: 'cn',
   CURRENT_APP_ID: 'com.xd.cindycn',
+  CURRENT_DISTRIBUTION_BRAND: null,
+  CURRENT_BRAND_IDENTITY: undefined,
+  CURRENT_DISTRIBUTION_ID: 'cindy-cn',
+  CURRENT_DISTRIBUTION_MANIFEST_SOURCE: null,
+  CURRENT_DISTRIBUTION_CAPABILITY_DEFAULTS: null,
 }));
 vi.mock('@/hooks/useLogin', () => ({ useLogin: () => loginHook.value }));
 vi.mock('@/components/title-bar/WindowControls', () => ({ WindowControls: () => null }));

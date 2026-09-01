@@ -7,7 +7,7 @@
  * `window.electronAPI.openExternal`,channel `shell:open-external` 只放行 http(s))。
  */
 
-import { CURRENT_CINDY_REGION } from './brandRegion';
+import { CURRENT_CINDY_REGION, CURRENT_DISTRIBUTION_BRAND } from './brandRegion';
 
 export interface LegalLinks {
   /** 服务条款 */
@@ -26,6 +26,15 @@ const GLOBAL_LEGAL_LINKS: LegalLinks = {
   privacyPolicy: 'https://protocol.xd.com/cindy/privacy.html',
 };
 
-/** 本构建区域的协议链接(dev 区域归 cn 系,与登录 identifier 形态同口径)。 */
-export const LEGAL_LINKS: LegalLinks =
-  CURRENT_CINDY_REGION === 'global' ? GLOBAL_LEGAL_LINKS : CN_LEGAL_LINKS;
+/**
+ * 本构建的协议链接。独立发行(工作流 C)走 profile 的品牌 URL(分发层注入);
+ * 官方构建按区域分流(dev 区域归 cn 系,与登录 identifier 形态同口径)。
+ */
+export const LEGAL_LINKS: LegalLinks = CURRENT_DISTRIBUTION_BRAND
+  ? {
+      termsOfService: CURRENT_DISTRIBUTION_BRAND.termsUrl,
+      privacyPolicy: CURRENT_DISTRIBUTION_BRAND.privacyUrl,
+    }
+  : CURRENT_CINDY_REGION === 'global'
+    ? GLOBAL_LEGAL_LINKS
+    : CN_LEGAL_LINKS;

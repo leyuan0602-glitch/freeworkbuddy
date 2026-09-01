@@ -928,6 +928,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // capability snapshot(工作流 E):首帧同步;renderer 只消费布尔投影,
   // 不接触任何端点 URL(main 是能力与端点的唯一真相源)。
   appCapabilities: ipcRenderer.sendSync('app-capabilities:get-sync') as Record<string, boolean> | null,
+  onAppCapabilitiesChanged: (
+    cb: (capabilities: Record<string, boolean>) => void,
+  ) => {
+    const listener = (
+      _event: unknown,
+      capabilities: Record<string, boolean>,
+    ): void => cb(capabilities);
+    ipcRenderer.on('app-capabilities:changed', listener);
+    return () => {
+      ipcRenderer.removeListener('app-capabilities:changed', listener);
+    };
+  },
   windowBackdropMaterial: readWindowBackdropMaterialFromArgv(process.argv),
   onWindowBackdropMaterialChanged: (
     cb: (material: import('../shared/windowBackdrop').WindowsBackdropMaterial) => void,
