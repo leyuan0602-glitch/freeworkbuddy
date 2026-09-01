@@ -270,7 +270,7 @@ type MarketPageResult =
   | { success: false; error?: string };
 
 export function useMarketList(
-  initialVisibility: Visibility = 'available',
+  initialVisibility: Visibility = 'all',
   options?: {
     /**
      * false 时完全不发市场请求(items 保持空、loading 保持 false)。
@@ -291,7 +291,7 @@ export function useMarketList(
     () => options?.initialScope ?? 'all',
   );
   const [categoryFilter, setCategoryFilterState] = useState<CategoryFilter>(CATEGORY_ALL);
-  // 默认 'available'：进入 Market 直接看"对自己有用"的内容。
+  // 默认展示当前身份可见的完整目录；“我的管理”由列表页显式切换。
   const [visibility, setVisibilityState] = useState<Visibility>(() => initialVisibility);
   const [state, setState] = useState<MarketListState>(INITIAL);
   // 当前正在跑 install 的 name 集合（按 name 串行；同 name 不能重复触发）

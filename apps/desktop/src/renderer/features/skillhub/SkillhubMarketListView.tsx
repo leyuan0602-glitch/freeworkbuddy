@@ -89,8 +89,7 @@ function SkillhubMarketListViewInner() {
   const navigate = useNavigate();
   const marketState = location.state as { freshEntry?: boolean; initialVisibility?: Visibility } | null;
   const initialVisibility = marketState?.initialVisibility === 'all' ||
-    marketState?.initialVisibility === 'mine' ||
-    marketState?.initialVisibility === 'available'
+    marketState?.initialVisibility === 'mine'
     ? marketState.initialVisibility
     : undefined;
   const {
@@ -379,12 +378,6 @@ function SkillhubMarketListViewInner() {
             </DropdownMenu>
           ) : null}
 
-          {/* 可获取默认选中,语义对齐 SkillHub 徽标 */}
-          <FilterChip
-            active={visibility === 'available'}
-            label={t('skillhub.market.chipAvailable')}
-            onClick={() => setVisibility('available')}
-          />
           <FilterChip
             active={visibility === 'all'}
             label={t('skillhub.market.chipAll')}

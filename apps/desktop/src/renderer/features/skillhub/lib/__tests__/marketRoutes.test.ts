@@ -60,6 +60,15 @@ describe('market route scope', () => {
     expect(listSource).toContain('marketCardPrimaryAction');
     expect(viewModelSource).toContain("input.listVisibility === 'mine'");
   });
+
+  it('shows the full visible catalog by default without an Available filter', () => {
+    const listSource = readFileSync(resolve(skillhubDir, 'SkillhubMarketListView.tsx'), 'utf8');
+    const hookSource = readFileSync(resolve(skillhubDir, 'hooks/useMarketList.ts'), 'utf8');
+
+    expect(listSource).not.toContain('skillhub.market.chipAvailable');
+    expect(listSource).not.toContain("setVisibility('available')");
+    expect(hookSource).toContain("initialVisibility: Visibility = 'all'");
+  });
 });
 
 describe('market management copy and errors', () => {
