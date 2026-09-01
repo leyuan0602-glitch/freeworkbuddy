@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolveRegionUserDataDirName } from '../regionUserData';
+import { BRAND_IDENTITY, type BrandIdentity } from '@cindy/maker-shared/brand-identity';
 
 /**
  * 同机双装的核心不变量:保持已发布的 cn=Cindy、global=CindyGlobal 映射，数据库 /
@@ -59,5 +60,58 @@ describe('resolveRegionUserDataDirName', () => {
         envUserDataDir: '/tmp/custom-profile',
       }),
     ).toBe('CindyGlobal');
+  });
+
+  // ---- 独立发行(工作流 B):与官方数据分库(蓝图 §3.3 验收)----
+  const SELFHOST_IDENTITY: BrandIdentity = {
+    ...BRAND_IDENTITY,
+    displayName: 'FreeWorkBuddy',
+    primaryScheme: 'freeworkbuddy',
+    legacySchemes: [],
+    appIdByRegion: { cn: 'me.freeworkbuddy.desktop', global: 'me.freeworkbuddy.desktop', dev: 'me.freeworkbuddy.desktop' },
+    userDataDirName: 'FreeWorkBuddy',
+    userDataDirNameByRegion: { cn: 'FreeWorkBuddy', global: 'FreeWorkBuddy', dev: 'FreeWorkBuddy' },
+    legacyUserDataDirNames: [],
+    legacyUserDataDirNamesByRegion: { cn: [], global: [], dev: [] },
+    legacyDialogueUserDataDirNamesByRegion: { cn: [], global: [], dev: [] },
+    dbFilePrefix: 'freeworkbuddy-selfhost',
+    legacyDbFilePrefixes: [],
+    updaterName: 'freeworkbuddy-selfhost-updater',
+    cdnPrefix: 'freeworkbuddy-selfhost',
+    executableName: 'FreeWorkBuddy',
+    executableNameByRegion: { cn: 'FreeWorkBuddy', global: 'FreeWorkBuddy', dev: 'FreeWorkBuddy' },
+  };
+
+  it('独立发行:任意 region 都无条件覆写到 profile 的 userData 目录', () => {
+    for (const region of ['cn', 'global', 'dev'] as const) {
+      expect(
+        resolveRegionUserDataDirName({
+          isPackaged: true,
+          region,
+          argv: ARGV,
+          identity: SELFHOST_IDENTITY,
+        }),
+      ).toBe('FreeWorkBuddy');
+    }
+    // 与官方 userData 目录名不同,绝不落到 Cindy / CindyGlobal / CindyDev。
+    expect(resolveRegionUserDataDirName({ isPackaged: true, region: 'global', argv: ARGV, identity: SELFHOST_IDENTITY }))
+      .not.toBe('CindyGlobal');
+  });
+
+  it('独立发行:显式 --user-data-dir 仍尊重调用方', () => {
+    expect(
+      resolveRegionUserDataDirName({
+        isPackaged: true,
+        region: 'global',
+        argv: ['FreeWorkBuddy.app', '--user-data-dir=/tmp/fwb'],
+        identity: SELFHOST_IDENTITY,
+      }),
+    ).toBeNull();
+  });
+
+  it('identity 缺省 = 官方行为不变(向后兼容)', () => {
+    expect(
+      resolveRegionUserDataDirName({ isPackaged: true, region: 'cn', argv: ARGV }),
+    ).toBeNull();
   });
 });

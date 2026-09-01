@@ -22,7 +22,7 @@
 
 import {
   BRAND_IDENTITY,
-  brandUserDataDirName,
+  type BrandIdentity,
   type CindyRegion,
 } from '@cindy/maker-shared/brand-identity';
 
@@ -34,15 +34,26 @@ function hasExplicitUserDataDir(argv: readonly string[]): boolean {
 /**
  * 解析本构建是否需要覆写 userData 目录。
  * 返回目录名(调用方拼到 appData 下)或 null(保持 Electron 默认)。
+ *
+ * identity(工作流 B):本构建的发行身份(main 从 brandRegion.CURRENT_BRAND_IDENTITY
+ * 传入;缺省官方 BRAND_IDENTITY)。官方路径沿用历史同名优化(cn 目录 = productName
+ * 派生 → 不覆写);独立发行与官方身份不同,无条件覆写到 profile 的 userDataName,
+ * 保证与官方发行版数据分库(蓝图 §3.3 验收:互不共享 userData)。
  */
 export function resolveRegionUserDataDirName(input: {
   isPackaged: boolean;
   region: CindyRegion;
   argv: readonly string[];
   envUserDataDir?: string;
+  identity?: BrandIdentity;
 }): string | null {
   if (hasExplicitUserDataDir(input.argv)) return null;
-  const dirName = brandUserDataDirName(input.region);
+  const identity = input.identity ?? BRAND_IDENTITY;
+  const dirName = identity.userDataDirNameByRegion[input.region];
+  // 独立发行:身份与官方不同,无条件覆写,不依赖 productName 派生同名判断
+  // (packaged 包的默认派生目录随打包身份走,显式 setPath 让隔离行为
+  // 不依赖打包器细节)。
+  if (identity !== BRAND_IDENTITY) return dirName;
   // 与 productName 默认派生目录同名(cn)→ 不覆写,走 Electron 原生路径。
   if (dirName === BRAND_IDENTITY.userDataDirName) return null;
   return dirName;

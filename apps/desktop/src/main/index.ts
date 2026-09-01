@@ -7,7 +7,7 @@ import { setDefaultAutoSelectFamilyAttemptTimeout } from 'node:net';
 import { exit, stderr } from 'node:process';
 import { BRAND_IDENTITY } from '@cindy/maker-shared/brand-identity';
 import { refreshBrowserRuntimeConfigDir } from '@cindy/browser-control-runtime/config-dir';
-import { CURRENT_CINDY_REGION } from '../shared/brandRegion.js';
+import { CURRENT_BRAND_IDENTITY, CURRENT_CINDY_REGION } from '../shared/brandRegion.js';
 import { resolveRegionUserDataDirName } from './regionUserData.js';
 import { createLogger, initLogger } from './logger.js';
 import { beginDesktopDevInstance, type DesktopDevMode } from './devStartupStatus.js';
@@ -22,6 +22,7 @@ const regionUserDataDirName = resolveRegionUserDataDirName({
   region: CURRENT_CINDY_REGION,
   argv: process.argv,
   envUserDataDir: process.env.XDT_USER_DATA_DIR,
+  identity: CURRENT_BRAND_IDENTITY,
 });
 if (regionUserDataDirName) {
   app.setPath('userData', path.join(app.getPath('appData'), regionUserDataDirName));
@@ -244,7 +245,7 @@ const desktopDevInstanceOptions = (() => {
     : 'unknown';
   return {
     userDataDir: app.getPath('userData'),
-    dbFilePrefix: BRAND_IDENTITY.dbFilePrefix,
+    dbFilePrefix: CURRENT_BRAND_IDENTITY.dbFilePrefix,
     rootDir,
     commit,
     mode,

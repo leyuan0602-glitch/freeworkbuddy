@@ -83,6 +83,7 @@ import {
   type EndpointManifestFailureKind,
 } from './endpointManifestDialogCopy';
 import { createLogger, getLogDir } from './logger';
+import { CURRENT_DISTRIBUTION_ID, CURRENT_DISTRIBUTION_MANIFEST_SOURCE, type DistributionManifestSource } from '../shared/brandRegion';
 import { ENDPOINT_MANIFEST_BASE_URL, ENDPOINT_MANIFEST_PEER_BASE_URL } from '../shared/endpoints';
 import { resolvePreferredSystemLocale } from '../shared/locale';
 
@@ -109,11 +110,21 @@ const DEFAULT_REALM_MANIFEST_BASE_URLS: RealmManifestBaseUrls =
  * 清单里未认证的数据,所以并集会让 CN 构建接受一份把 authApiBaseUrl 换成 Global 真实
  * 服务的伪造缓存,离线启动后把 CN 的 token 发去 Global(review 抓到)。
  * 详见 endpointManifestCache.ts 的 REGION_ENDPOINT_DOMAIN / CROSS_REGION_ENDPOINT_KEYS。
+ *
+ * 独立发行(工作流 D):信任根来自构建期 profile 的 trustedEndpointDomains,
+ * 不含官方域;自举/缓存主机越出该域即 fail closed。
  */
-const CACHED_ENDPOINT_ORIGIN_POLICY = {
-  regionDomain: REGION_ENDPOINT_DOMAIN[BUILD_AUTH_REGION],
-  crossRegionDomain: REGION_ENDPOINT_DOMAIN.global,
-} as const;
+const CACHED_ENDPOINT_ORIGIN_POLICY = CURRENT_DISTRIBUTION_MANIFEST_SOURCE
+  ? ({
+      // 独立发行:信任根 = profile 的首个可信域(当前 self-host profile 单域);
+      // 多信任域在 Phase 2 remote 部署时随 CachedEndpointOriginPolicy 类型扩展。
+      regionDomain: CURRENT_DISTRIBUTION_MANIFEST_SOURCE.trustedEndpointDomains[0],
+      crossRegionDomain: CURRENT_DISTRIBUTION_MANIFEST_SOURCE.trustedEndpointDomains[0],
+    } as const)
+  : ({
+      regionDomain: REGION_ENDPOINT_DOMAIN[BUILD_AUTH_REGION],
+      crossRegionDomain: REGION_ENDPOINT_DOMAIN.global,
+    } as const);
 
 /** 单次请求的网络超时——只用于触发错误框,不是静默降级。 */
 const ATTEMPT_TIMEOUT_MS = 15_000;
@@ -148,7 +159,10 @@ export const CLIENT_ENDPOINTS_SYNC_CHANNEL = 'client-endpoints:get-sync';
 
 // ── 清单来源解析(纯函数,规则 14:内存 harness 可测) ─────────────────────
 
-export type EndpointSource = { kind: 'cdn' } | { kind: 'file'; filePath: string };
+export type EndpointSource =
+  | { kind: 'cdn' }
+  | { kind: 'file'; filePath: string }
+  | { kind: 'embedded' };
 
 export interface ResolveEndpointSourceInput {
   isPackaged: boolean;
@@ -160,14 +174,27 @@ export interface ResolveEndpointSourceInput {
   };
   /** 仓库根(dev 下 app.getAppPath() = apps/desktop,向上两级)。 */
   repoRoot: string;
+  /**
+   * 发行身份的 manifest 自举来源(工作流 D;main 从 brandRegion 传入)。
+   * embedded = Local-first(清单烘焐进产物,不做网络自举);官方构建为 null。
+   */
+  manifestSource?: {
+    mode: 'embedded' | 'remote';
+    embeddedManifest?: { schemaVersion: number };
+    bootstrapUrl?: string;
+    trustedEndpointDomains: readonly string[];
+  } | null;
 }
 
 /**
- * 决定清单从哪来:packaged 恒 CDN;dev 默认读仓内 config/endpoint.json,
+ * 决定清单从哪来:独立发行 embedded 恒烘焙(最高优先,不做网络自举);
+ * 官方 packaged 恒 CDN;dev 默认读仓内 config/endpoint.json,
  * XDT_ENDPOINT_MANIFEST_FILE 覆盖文件路径(相对路径以仓根为基准),
- * XDT_ENDPOINTS_CDN='1' 切回完整 CDN 链路。
+ * XDT_ENDPOINTS_CDN='1' 切回完整 CDN 链路。独立发行 remote 走 CDN 分支,
+ * 但自举基址由 manifestSource.bootstrapUrl 注入(调用方处理,见 initClientEndpoints)。
  */
 export function resolveEndpointSource(input: ResolveEndpointSourceInput): EndpointSource {
+  if (input.manifestSource?.mode === 'embedded') return { kind: 'embedded' };
   if (input.isPackaged) return { kind: 'cdn' };
   if (input.env.XDT_ENDPOINTS_CDN === '1') return { kind: 'cdn' };
   const override = input.env.XDT_ENDPOINT_MANIFEST_FILE?.trim();
@@ -610,8 +637,15 @@ export function promptRetryDialog(
 
 let resolvedEndpoints: ClientEndpointMap | null = null;
 let resolvedRegion: ClientEndpointRegion | null = null;
-let crossRealmOrgLoginEnabled = BUILD_VARIANT !== 'dev';
-let realmManifestBaseUrls: RealmManifestBaseUrls = DEFAULT_REALM_MANIFEST_BASE_URLS;
+// 独立发行:单 realm(蓝图 §2.4 self-host v1 内部 realm 固定 global),
+// 跨 realm 组织登录永久关闭(官方 cn/global 保留现有双 realm 行为)。
+let crossRealmOrgLoginEnabled = BUILD_VARIANT !== 'dev' && CURRENT_DISTRIBUTION_MANIFEST_SOURCE === null;
+let realmManifestBaseUrls: RealmManifestBaseUrls = CURRENT_DISTRIBUTION_MANIFEST_SOURCE
+  ? {
+      cn: CURRENT_DISTRIBUTION_MANIFEST_SOURCE.bootstrapUrl ?? '',
+      global: CURRENT_DISTRIBUTION_MANIFEST_SOURCE.bootstrapUrl ?? '',
+    }
+  : DEFAULT_REALM_MANIFEST_BASE_URLS;
 let activeSessionRealm: ClientEndpointRegion | null = null;
 const realmEndpointCache = new Map<ClientEndpointRegion, ClientEndpointMap>();
 /** 本次启动是否走了离线缓存(自动回退或用户确认,而非本次网络拉取)。 */
@@ -1081,8 +1115,36 @@ function cacheResolvedManifest(manifestUrl: string, manifestText: string): void 
  * 错误框选择退出(app.exit 已调用,调用方必须立即 return,不再继续启动流程)。
  */
 export async function initClientEndpoints(): Promise<boolean> {
+  // 独立发行 embedded(Local-first):清单烘焐进产物,不做网络自举、不重试、
+  // 不诊断、不写缓存 —— 同一套 strict parser,非法即抛错(构建期已校验,
+  // 运行时失败只能是包体被篡改)。蓝图 §3.5:Local-first packaged 断网首启。
+  if (CURRENT_DISTRIBUTION_MANIFEST_SOURCE?.mode === 'embedded') {
+    const raw = JSON.stringify(CURRENT_DISTRIBUTION_MANIFEST_SOURCE.embeddedManifest);
+    const parsed = resolveClientEndpointsStrict(raw);
+    if (!parsed.ok) {
+      log.error('embedded endpoint manifest failed strict parse: %s', parsed.reason);
+      dialog.showErrorBox(
+        'Endpoint manifest error',
+        `The bundled endpoint manifest is invalid (${parsed.reason}). Please reinstall the application.`,
+      );
+      app.exit(1);
+      return false;
+    }
+    resolvedEndpoints = parsed.endpoints;
+    resolvedRegion = parsed.region ?? null;
+    activeSessionRealm = resolvedRegion ?? BUILD_AUTH_REGION;
+    startedFromCachedManifest = false;
+    log.info(
+      'resolved from embedded manifest: auth=%s cdn=%s (distribution=%s)',
+      resolvedEndpoints.authApiBaseUrl,
+      resolvedEndpoints.cdnBaseUrl,
+      CURRENT_DISTRIBUTION_ID,
+    );
+    return true;
+  }
   const source = resolveEndpointSource({
     isPackaged: app.isPackaged,
+    manifestSource: CURRENT_DISTRIBUTION_MANIFEST_SOURCE,
     env: {
       XDT_ENDPOINTS_CDN: process.env.XDT_ENDPOINTS_CDN,
       XDT_ENDPOINT_MANIFEST_FILE: process.env.XDT_ENDPOINT_MANIFEST_FILE,
@@ -1090,20 +1152,34 @@ export async function initClientEndpoints(): Promise<boolean> {
     // dev 下 app.getAppPath() = apps/desktop;packaged 不走 file 分支,该值无消费。
     repoRoot: path.resolve(app.getAppPath(), '..', '..'),
   });
-  const manifestUrl = `${ENDPOINT_MANIFEST_BASE_URL}/${MANIFEST_FILE_NAME}`;
-  const sourceLabel = source.kind === 'cdn' ? manifestUrl : source.filePath;
+  // 独立发行 remote:自举 URL 来自 profile 的 bootstrapUrl(官方链路的
+  // VITE_ENDPOINT_MANIFEST_BASE_URL 在 self-host 构建期已清空)。
+  const bootstrapBaseUrl =
+    CURRENT_DISTRIBUTION_MANIFEST_SOURCE?.mode === 'remote'
+      ? CURRENT_DISTRIBUTION_MANIFEST_SOURCE.bootstrapUrl ?? ''
+      : ENDPOINT_MANIFEST_BASE_URL;
+  const peerBaseUrl =
+    CURRENT_DISTRIBUTION_MANIFEST_SOURCE
+      ? '' // 独立发行单 realm,无 peer 基址(跨 realm discovery 已关)
+      : ENDPOINT_MANIFEST_PEER_BASE_URL;
+  const manifestUrl = `${bootstrapBaseUrl}/${MANIFEST_FILE_NAME}`;
+  const sourceLabel =
+    source.kind === 'cdn' ? manifestUrl : source.kind === 'file' ? source.filePath : 'embedded';
   const dialogLocale = resolveDialogLocale();
   // 自检:写死的区域域名必须覆盖本构建实际使用的两个自举基址。域名迁移时忘了更新
   // REGION_ENDPOINT_DOMAIN 的后果是离线出口 fail closed(新域名的缓存判不可信),
   // 这条 error 日志保证它不会静默失效到没人知道。不阻断启动:主路径不消费该清单。
-  const knownRegionDomains = Object.values(REGION_ENDPOINT_DOMAIN);
+  // 独立发行:信任根来自 profile(官方域表不适用),remote 自举必须落在 profile 域内。
+  const knownRegionDomains = CURRENT_DISTRIBUTION_MANIFEST_SOURCE
+    ? [...CURRENT_DISTRIBUTION_MANIFEST_SOURCE.trustedEndpointDomains]
+    : Object.values(REGION_ENDPOINT_DOMAIN);
   const untrustedBootstrap = findBootstrapHostOutsideTrustedDomains(
-    [ENDPOINT_MANIFEST_BASE_URL, ENDPOINT_MANIFEST_PEER_BASE_URL],
+    [bootstrapBaseUrl, peerBaseUrl],
     knownRegionDomains,
   );
   if (untrustedBootstrap) {
     log.error(
-      'bootstrap host %s is outside REGION_ENDPOINT_DOMAIN [%s]; offline start will be unavailable until the list is updated',
+      'bootstrap host %s is outside trusted domains [%s]; offline start will be unavailable until the list is updated',
       untrustedBootstrap,
       knownRegionDomains.join(', '),
     );
@@ -1117,15 +1193,17 @@ export async function initClientEndpoints(): Promise<boolean> {
   } = { value: null, fromCache: false };
   const endpoints = await resolveClientEndpointsBlocking({
     fetchManifest:
-      source.kind === 'cdn'
-        ? fetchManifestViaCdn
-        : () => Promise.resolve(readManifestFromFile(source.filePath)),
+      source.kind === 'file'
+        ? () => Promise.resolve(readManifestFromFile(source.filePath))
+        : fetchManifestViaCdn,
     promptRetry: (context) => promptRetryDialog(context, sourceLabel, dialogLocale),
     exitApp: () => app.exit(1),
     allowHttp: source.kind === 'file',
     expectedRegionWhenPresent: BUILD_AUTH_REGION,
-    // dev 本地文件:读不到就是路径/内容配置错,不自动重试、也按配置事故出文案
-    // (见 BlockingResolveDeps 的 autoRetryDelaysMs / classifyFailure)。
+    // 独立发行 remote(工作流 D):清单域名是 profile 域,但解析零放松;
+    // embedded 分支已在上方返回,不会走到这里。dev 本地文件:读不到就是路径/内容配置错,
+    // 不自动重试、也按配置事故出文案(见 BlockingResolveDeps 的 autoRetryDelaysMs /
+    // classifyFailure)。
     autoRetryDelaysMs: source.kind === 'cdn' ? undefined : [],
     classifyFailure: source.kind === 'cdn' ? undefined : () => 'config',
     // 诊断与离线出口只对 CDN 路径有意义:file 模式的失败是本地路径/内容配置错,

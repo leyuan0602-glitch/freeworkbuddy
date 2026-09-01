@@ -1,5 +1,11 @@
 // =============================================================================
-// self-host-region.mjs —— 自建线「地区分包」配置的唯一加载入口(cn / global)
+// self-host-region.mjs —— 官方发行线「地区分包」配置的唯一加载入口(cn / global)
+//
+// 职责边界(工作流 B 改造,蓝图 §3.3):本文件是**官方发行**的 Mobile 地区分包
+// 投影(official profile 的构建参数),不是 self-host 后端能力的声明——独立发行
+// (freeworkbuddy-selfhost)的 Mobile 构建投影在 scripts/lib/distribution-profile.cjs,
+// 由 CINDY_DISTRIBUTION_PROFILE env 选取,身份单点在
+// packages/maker-shared/src/distributionProfile.ts。
 //
 // 自建冷更/热更脚本(release-{ios,android}-{local,ota,check}.mjs)通过 `--region cn|global`
 // 选出本次出包的地区,所有随地区变化的**非机密**分包参数(bundleId / package /

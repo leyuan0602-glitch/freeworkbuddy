@@ -925,6 +925,9 @@ type CindyMediaPreferenceKind = {
 
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
+  // capability snapshot(工作流 E):首帧同步;renderer 只消费布尔投影,
+  // 不接触任何端点 URL(main 是能力与端点的唯一真相源)。
+  appCapabilities: ipcRenderer.sendSync('app-capabilities:get-sync') as Record<string, boolean> | null,
   windowBackdropMaterial: readWindowBackdropMaterialFromArgv(process.argv),
   onWindowBackdropMaterialChanged: (
     cb: (material: import('../shared/windowBackdrop').WindowsBackdropMaterial) => void,

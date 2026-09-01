@@ -48,7 +48,12 @@ function verifiedCloudUserId(state: AuthStateSnapshot): string | null {
 
 function startCloudHeartbeat(uid: string): void {
   // 运行期端点清单(initClientEndpoints 在 app.ready 内早于本服务,清单全权无兜底)
+  // 工作流 E:heartbeatUrl 为空(未部署/独立发行)时不启动,无 timer、无请求、无错误。
   const endpoint = getClientEndpoint('heartbeatUrl');
+  if (!endpoint) {
+    log.info('heartbeat disabled: heartbeatUrl is empty in this distribution');
+    return;
+  }
   handleUid = uid;
   handleRealm = authManager.getActiveAuthRealm();
   handle = createHeartbeatClient({

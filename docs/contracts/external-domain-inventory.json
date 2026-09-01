@@ -1,0 +1,1474 @@
+{
+  "version": 1,
+  "updatedAt": "2026-09-01",
+  "purpose": [
+    "FreeWorkBuddy self-hosting 工作流 A/C(蓝图 §3.2、§3.4):生产代码外部域名台账 + no-egress allowlist。",
+    "scripts/check-self-host-egress.mjs 扫描与本文件同一范围的字符串字面量域名;新增未登记域名 CI 失败。",
+    "official-cindy 条目是 Phase 1 no-egress 的移除目标:Self-host 发行版运行时请求必须为 0;在此先如实登记。"
+  ],
+  "matching": {
+    "exact": "host 精确命中条目。",
+    "subdomain": "host 以 \".\" + allowSubdomains 条目 host 结尾时命中该条目(仅 allowSubdomains: true 的条目参与)。",
+    "officialStrict": "official-cindy 母域条目 allowSubdomains: false:官方母域下新增子域必须逐个登记,防止悄悄增加官方 egress 面。"
+  },
+  "dispositions": {
+    "official-runtime": "官方 Cindy 发行版运行时依赖;self-host 发行版的目标是请求为 0(Phase 1 no-egress)。",
+    "user-configured-egress": "仅在用户显式配置后访问(BYOK provider);self-host 下是唯一允许的运行时外部流量类别。",
+    "feature-scoped-egress": "随具体功能(集成/内容源/图表/资产 CDN)访问;self-host 需逐项审计是否保留。",
+    "build-injected": "由构建注入的第三方端点;未配置即不访问。",
+    "doc-only": "注释/文档/规范链接,运行时不发起请求。",
+    "test-stub": "测试与文档桩域名,不构成真实 egress。",
+    "local-only": "本机回环/开发地址/防护用例引用。",
+    "needs-triage": "自动发现未分类;不允许长期停留在该类别。",
+    "selfhost-runtime": "FreeWorkBuddy 独立发行自身的部署端点;官方 Cindy no-egress 目标不涉及本类别。"
+  },
+  "scanRoots": [
+    "apps/desktop/src",
+    "apps/desktop/bootstrap-electron.ts",
+    "apps/desktop/forge.config.ts",
+    "apps/mobile/src",
+    "apps/mobile/app.config.js",
+    "apps/mobile/eas.json",
+    "apps/mobile/app.json",
+    "packages",
+    "config",
+    "scripts/ensure-agent-binaries.mjs",
+    "scripts/agent-binary-cdn-fallback.mjs"
+  ],
+  "domains": [
+    {
+      "host": "e.tapdb.ap-sg.tapapis.com",
+      "category": "analytics",
+      "disposition": "official-runtime",
+      "note": "TapDB 埋点采集(官方发行版专属,self-host telemetryPolicy=disabled 时不初始化)"
+    },
+    {
+      "host": "e.tapdb.com",
+      "category": "analytics",
+      "disposition": "official-runtime",
+      "note": "TapDB 埋点采集(官方发行版专属,self-host telemetryPolicy=disabled 时不初始化)"
+    },
+    {
+      "host": "fonts.googleapis.com",
+      "category": "cdn-asset",
+      "disposition": "feature-scoped-egress",
+      "note": "Web 字体/图标/Expo 更新等资产 CDN"
+    },
+    {
+      "host": "fonts.gstatic.com",
+      "category": "cdn-asset",
+      "disposition": "feature-scoped-egress",
+      "note": "Web 字体/图标/Expo 更新等资产 CDN"
+    },
+    {
+      "host": "u.expo.dev",
+      "category": "cdn-asset",
+      "disposition": "feature-scoped-egress",
+      "note": "Web 字体/图标/Expo 更新等资产 CDN"
+    },
+    {
+      "host": "vercel.com",
+      "category": "cdn-asset",
+      "disposition": "feature-scoped-egress",
+      "note": "Web 字体/图标/Expo 更新等资产 CDN"
+    },
+    {
+      "host": "www.gstatic.com",
+      "category": "cdn-asset",
+      "disposition": "feature-scoped-egress",
+      "note": "Web 字体/图标/Expo 更新等资产 CDN"
+    },
+    {
+      "host": "api.bilibili.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "api.coingecko.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "api.stackexchange.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "api.zsxq.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "app.cj.sina.com.cn",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "blog.sina.com.cn",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "book.douban.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "books.toscrape.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "dev.to",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "en.wikipedia.org",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "eutils.ncbi.nlm.nih.gov",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "export.arxiv.org",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "feeds.bbci.co.uk",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "feeds.bloomberg.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "finance.sina.com.cn",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "finance.yahoo.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "hn.algolia.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "hq.sinajs.cn",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "i.weread.qq.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "item.jd.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "linux.do",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "lobste.rs",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "m.ctrip.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "m.okjike.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "medium.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "movie.douban.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "news.ycombinator.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "query1.finance.yahoo.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "s.weibo.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "search.douban.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "search.sina.com.cn",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "search.smzdm.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "stock.xueqiu.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "store.steampowered.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "substack.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "suggest3.sinajs.cn",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "tieba.baidu.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "web.okjike.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "weibo.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "weread.qq.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "www.36kr.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "www.baidu.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "www.barchart.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "www.bilibili.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "www.bing.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "www.coupang.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "www.douyin.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "www.facebook.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "www.google.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "www.imdb.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "www.instagram.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "www.linkedin.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "www.pixiv.net",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "www.producthunt.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "www.reddit.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "www.reuters.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "www.scrapethissite.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "www.smzdm.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "www.v2ex.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "www.xiaohongshu.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "www.xiaoyuzhoufm.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "www.youtube.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "www.zhihu.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "wx.zsxq.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "x.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "xhslink.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "xueqiu.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "zhuanlan.zhihu.com",
+      "category": "content-source",
+      "disposition": "feature-scoped-egress",
+      "note": "内置搜索/抓取/浏览类功能的内容源或示例"
+    },
+    {
+      "host": "app.diagrams.net",
+      "category": "diagram-service",
+      "disposition": "feature-scoped-egress",
+      "note": "draw.io/diagrams.net 图表集成"
+    },
+    {
+      "host": "convert.diagrams.net",
+      "category": "diagram-service",
+      "disposition": "feature-scoped-egress",
+      "note": "draw.io/diagrams.net 图表集成"
+    },
+    {
+      "host": "log.diagrams.net",
+      "category": "diagram-service",
+      "disposition": "feature-scoped-egress",
+      "note": "draw.io/diagrams.net 图表集成"
+    },
+    {
+      "host": "log.draw.io",
+      "category": "diagram-service",
+      "disposition": "feature-scoped-egress",
+      "note": "draw.io/diagrams.net 图表集成"
+    },
+    {
+      "host": "plant-aws.diagrams.net",
+      "category": "diagram-service",
+      "disposition": "feature-scoped-egress",
+      "note": "draw.io/diagrams.net 图表集成"
+    },
+    {
+      "host": "preprod.diagrams.net",
+      "category": "diagram-service",
+      "disposition": "feature-scoped-egress",
+      "note": "draw.io/diagrams.net 图表集成"
+    },
+    {
+      "host": "test.draw.io",
+      "category": "diagram-service",
+      "disposition": "feature-scoped-egress",
+      "note": "draw.io/diagrams.net 图表集成"
+    },
+    {
+      "host": "viewer.diagrams.net",
+      "category": "diagram-service",
+      "disposition": "feature-scoped-egress",
+      "note": "draw.io/diagrams.net 图表集成"
+    },
+    {
+      "host": "vss.draw.io",
+      "category": "diagram-service",
+      "disposition": "feature-scoped-egress",
+      "note": "draw.io/diagrams.net 图表集成"
+    },
+    {
+      "host": "www.draw.io",
+      "category": "diagram-service",
+      "disposition": "feature-scoped-egress",
+      "note": "draw.io/diagrams.net 图表集成"
+    },
+    {
+      "host": "www.drawio.com",
+      "category": "diagram-service",
+      "disposition": "feature-scoped-egress",
+      "note": "draw.io/diagrams.net 图表集成"
+    },
+    {
+      "host": "cdn3.iconfinder.com",
+      "category": "doc-reference",
+      "disposition": "doc-only",
+      "note": "注释/文档/规范链接,运行时不发起请求"
+    },
+    {
+      "host": "chevrotain.io",
+      "category": "doc-reference",
+      "disposition": "doc-only",
+      "note": "parser 库文档链接(仅文档引用)(manualEntry: 仅出现在代码扩展名之外的文档/注释)",
+      "manualEntry": true
+    },
+    {
+      "host": "crates.io",
+      "category": "doc-reference",
+      "disposition": "doc-only",
+      "note": "注释/文档/规范链接,运行时不发起请求"
+    },
+    {
+      "host": "cua.ai",
+      "category": "doc-reference",
+      "disposition": "doc-only",
+      "note": "注释/文档/规范链接,运行时不发起请求"
+    },
+    {
+      "host": "developer.mozilla.org",
+      "category": "doc-reference",
+      "disposition": "doc-only",
+      "note": "注释/文档/规范链接,运行时不发起请求"
+    },
+    {
+      "host": "dl.google.com",
+      "category": "doc-reference",
+      "disposition": "doc-only",
+      "note": "注释/文档/规范链接,运行时不发起请求"
+    },
+    {
+      "host": "e.com",
+      "category": "doc-reference",
+      "disposition": "doc-only",
+      "note": "注释/文档/规范链接,运行时不发起请求"
+    },
+    {
+      "host": "git-scm.com",
+      "category": "doc-reference",
+      "disposition": "doc-only",
+      "note": "注释/文档/规范链接,运行时不发起请求"
+    },
+    {
+      "host": "help.aliyun.com",
+      "category": "doc-reference",
+      "disposition": "doc-only",
+      "note": "注释/文档/规范链接,运行时不发起请求"
+    },
+    {
+      "host": "material-theme.com",
+      "category": "doc-reference",
+      "disposition": "doc-only",
+      "note": "注释/文档/规范链接,运行时不发起请求"
+    },
+    {
+      "host": "modernizr.com",
+      "category": "doc-reference",
+      "disposition": "doc-only",
+      "note": "注释/文档/规范链接,运行时不发起请求"
+    },
+    {
+      "host": "nodejs.org",
+      "category": "doc-reference",
+      "disposition": "doc-only",
+      "note": "注释/文档/规范链接,运行时不发起请求"
+    },
+    {
+      "host": "pypi.org",
+      "category": "doc-reference",
+      "disposition": "doc-only",
+      "note": "注释/文档/规范链接,运行时不发起请求"
+    },
+    {
+      "host": "registry.npmjs.org",
+      "category": "doc-reference",
+      "disposition": "doc-only",
+      "note": "注释/文档/规范链接,运行时不发起请求"
+    },
+    {
+      "host": "w3.org",
+      "category": "doc-reference",
+      "disposition": "doc-only",
+      "note": "XML/规范 namespace(allowSubdomains;www.w3.org 等 URI 常量不发起请求)",
+      "allowSubdomains": true
+    },
+    {
+      "host": "www.apache.org",
+      "category": "doc-reference",
+      "disposition": "doc-only",
+      "note": "注释/文档/规范链接,运行时不发起请求(manualEntry: 仅出现在代码扩展名之外的文档/注释)",
+      "manualEntry": true
+    },
+    {
+      "host": "www.apple.com",
+      "category": "doc-reference",
+      "disposition": "doc-only",
+      "note": "注释/文档/规范链接,运行时不发起请求"
+    },
+    {
+      "host": "www.npmjs.com",
+      "category": "doc-reference",
+      "disposition": "doc-only",
+      "note": "注释/文档/规范链接,运行时不发起请求"
+    },
+    {
+      "host": "accounts.feishu.cn",
+      "category": "integration-provider",
+      "disposition": "feature-scoped-egress",
+      "note": "IM/社区/代码托管集成或其安全测试用例域名"
+    },
+    {
+      "host": "accounts.larksuite.com",
+      "category": "integration-provider",
+      "disposition": "feature-scoped-egress",
+      "note": "IM/社区/代码托管集成或其安全测试用例域名"
+    },
+    {
+      "host": "api.dingtalk.com",
+      "category": "integration-provider",
+      "disposition": "feature-scoped-egress",
+      "note": "IM/社区/代码托管集成或其安全测试用例域名"
+    },
+    {
+      "host": "api.fxtwitter.com",
+      "category": "integration-provider",
+      "disposition": "feature-scoped-egress",
+      "note": "IM/社区/代码托管集成或其安全测试用例域名"
+    },
+    {
+      "host": "api.github.com",
+      "category": "integration-provider",
+      "disposition": "feature-scoped-egress",
+      "note": "IM/社区/代码托管集成或其安全测试用例域名"
+    },
+    {
+      "host": "api.telegram.org",
+      "category": "integration-provider",
+      "disposition": "feature-scoped-egress",
+      "note": "IM/社区/代码托管集成或其安全测试用例域名"
+    },
+    {
+      "host": "api.x.aievil.com",
+      "category": "integration-provider",
+      "disposition": "feature-scoped-egress",
+      "note": "IM/社区/代码托管集成或其安全测试用例域名"
+    },
+    {
+      "host": "challenges.cloudflare.com",
+      "category": "integration-provider",
+      "disposition": "feature-scoped-egress",
+      "note": "IM/社区/代码托管集成或其安全测试用例域名"
+    },
+    {
+      "host": "codeload.github.com",
+      "category": "integration-provider",
+      "disposition": "feature-scoped-egress",
+      "note": "IM/社区/代码托管集成或其安全测试用例域名"
+    },
+    {
+      "host": "discord.com",
+      "category": "integration-provider",
+      "disposition": "feature-scoped-egress",
+      "note": "IM/社区/代码托管集成或其安全测试用例域名"
+    },
+    {
+      "host": "discord.gg",
+      "category": "integration-provider",
+      "disposition": "feature-scoped-egress",
+      "note": "IM/社区/代码托管集成或其安全测试用例域名"
+    },
+    {
+      "host": "docs.github.com",
+      "category": "integration-provider",
+      "disposition": "feature-scoped-egress",
+      "note": "IM/社区/代码托管集成或其安全测试用例域名"
+    },
+    {
+      "host": "drive.google.com",
+      "category": "integration-provider",
+      "disposition": "feature-scoped-egress",
+      "note": "IM/社区/代码托管集成或其安全测试用例域名"
+    },
+    {
+      "host": "git-lfs.github.com",
+      "category": "integration-provider",
+      "disposition": "feature-scoped-egress",
+      "note": "IM/社区/代码托管集成或其安全测试用例域名"
+    },
+    {
+      "host": "github.com",
+      "category": "integration-provider",
+      "disposition": "feature-scoped-egress",
+      "note": "IM/社区/代码托管集成或其安全测试用例域名"
+    },
+    {
+      "host": "gitlab.com",
+      "category": "integration-provider",
+      "disposition": "feature-scoped-egress",
+      "note": "IM/社区/代码托管集成或其安全测试用例域名"
+    },
+    {
+      "host": "ilinkai.weixin.qq.com",
+      "category": "integration-provider",
+      "disposition": "feature-scoped-egress",
+      "note": "IM/社区/代码托管集成或其安全测试用例域名"
+    },
+    {
+      "host": "mp.weixin.qq.com",
+      "category": "integration-provider",
+      "disposition": "feature-scoped-egress",
+      "note": "IM/社区/代码托管集成或其安全测试用例域名"
+    },
+    {
+      "host": "novac2c.cdn.weixin.qq.com",
+      "category": "integration-provider",
+      "disposition": "feature-scoped-egress",
+      "note": "IM/社区/代码托管集成或其安全测试用例域名"
+    },
+    {
+      "host": "oapi.dingtalk.com",
+      "category": "integration-provider",
+      "disposition": "feature-scoped-egress",
+      "note": "IM/社区/代码托管集成或其安全测试用例域名"
+    },
+    {
+      "host": "open-dev.dingtalk.com",
+      "category": "integration-provider",
+      "disposition": "feature-scoped-egress",
+      "note": "IM/社区/代码托管集成或其安全测试用例域名"
+    },
+    {
+      "host": "open.feishu.cn",
+      "category": "integration-provider",
+      "disposition": "feature-scoped-egress",
+      "note": "IM/社区/代码托管集成或其安全测试用例域名"
+    },
+    {
+      "host": "open.larksuite.com",
+      "category": "integration-provider",
+      "disposition": "feature-scoped-egress",
+      "note": "IM/社区/代码托管集成或其安全测试用例域名"
+    },
+    {
+      "host": "public.api.bsky.app",
+      "category": "integration-provider",
+      "disposition": "feature-scoped-egress",
+      "note": "IM/社区/代码托管集成或其安全测试用例域名"
+    },
+    {
+      "host": "qyapi.weixin.qq.com",
+      "category": "integration-provider",
+      "disposition": "feature-scoped-egress",
+      "note": "IM/社区/代码托管集成或其安全测试用例域名"
+    },
+    {
+      "host": "raw.githubusercontent.com",
+      "category": "integration-provider",
+      "disposition": "feature-scoped-egress",
+      "note": "IM/社区/代码托管集成或其安全测试用例域名"
+    },
+    {
+      "host": "t.me",
+      "category": "integration-provider",
+      "disposition": "feature-scoped-egress",
+      "note": "IM/社区/代码托管集成或其安全测试用例域名"
+    },
+    {
+      "host": "0.0.0.0",
+      "category": "local-address",
+      "disposition": "local-only",
+      "note": "本机回环/开发地址"
+    },
+    {
+      "host": "127.0.0.1",
+      "category": "local-address",
+      "disposition": "local-only",
+      "note": "本机回环/开发地址"
+    },
+    {
+      "host": "169.254.169.254",
+      "category": "local-address",
+      "disposition": "local-only",
+      "note": "云 metadata endpoint(安全文档/防护用例引用)"
+    },
+    {
+      "host": "accounts.x.ai",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "ai-gateway.vercel.sh",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "ai.google.dev",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "api-docs.deepseek.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "api.anthropic.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "api.deepseek.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "api.elevenlabs.io",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "api.kimi.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "api.lkeap.cloud.tencent.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "api.longcat.chat",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "api.minimax.io",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "api.minimaxi.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "api.moonshot.ai",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "api.moonshot.cn",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "api.myprovider.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "api.openai.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "api.x.ai",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "api.xiaomimimo.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "api.z.ai",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "ark.cn-beijing.volces.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "auth.openai.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "auth.x.ai",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "chatgpt.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "claude.ai",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "claude.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "cli-chat-proxy.grok.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "cloud.tencent.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "coding.dashscope.aliyuncs.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "console.anthropic.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "console.x.ai",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "developers.openai.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "docs.anthropic.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问(manualEntry: 仅出现在代码扩展名之外的文档/注释)",
+      "manualEntry": true
+    },
+    {
+      "host": "docs.bigmodel.cn",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "docs.litellm.ai",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "docs.vllm.ai",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "docs.volcengine.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "docs.x.ai",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "docs.z.ai",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "downloads.claude.ai",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "generativelanguage.googleapis.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "grok.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "huggingface.co",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "lmstudio.ai",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "longcat.chat",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "mimo.mi.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "open.bigmodel.cn",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "opencode.ai",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "openrouter.ai",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "platform.claude.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "platform.minimax.io",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "platform.minimaxi.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "platform.moonshot.ai",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "platform.moonshot.cn",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "platform.openai.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "token-plan-cn.xiaomimimo.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "token-plan.cn-beijing.maas.aliyuncs.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "www.kimi.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "www.volcengine.com",
+      "category": "model-provider",
+      "disposition": "user-configured-egress",
+      "note": "BYOK/本地模型 provider 直连或其文档控制台;由用户显式配置后客户端才访问"
+    },
+    {
+      "host": "auth.cindy.app",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "auth-server (global)",
+      "officialParent": "cindy.app"
+    },
+    {
+      "host": "auth.cindy.com.cn",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "auth-server (cn)",
+      "officialParent": "cindy.com.cn"
+    },
+    {
+      "host": "cindy.ai",
+      "category": "official-cindy",
+      "disposition": "doc-only",
+      "note": "官方品牌域名(文档引用;self-host 发行版不得访问)(manualEntry: 仅出现在代码扩展名之外的文档/注释)",
+      "allowSubdomains": false,
+      "manualEntry": true
+    },
+    {
+      "host": "cindy.app",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "global 区正式发行版全部业务服务母域(同上)",
+      "allowSubdomains": false
+    },
+    {
+      "host": "cindy.cn",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "官方品牌域名(文档/外链引用)",
+      "allowSubdomains": false
+    },
+    {
+      "host": "cindy.com.cn",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "cn 区正式发行版全部业务服务母域(auth/device-link/oauth-broker/oss/heartbeat/hook/model-access/voice/github/skillhub/plugin/hotfix/mobile-update/官网)",
+      "allowSubdomains": false
+    },
+    {
+      "host": "device-link.cindy.app",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "device-link server (global)",
+      "officialParent": "cindy.app"
+    },
+    {
+      "host": "device-link.cindy.com.cn",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "device-link server (cn)",
+      "officialParent": "cindy.com.cn"
+    },
+    {
+      "host": "github.cindy.app",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "github-server 反馈代理 (global)",
+      "officialParent": "cindy.app"
+    },
+    {
+      "host": "github.cindy.com.cn",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "github-server 反馈代理 (cn)",
+      "officialParent": "cindy.com.cn"
+    },
+    {
+      "host": "heartbeat.cindy.app",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "heartbeat (global)",
+      "officialParent": "cindy.app"
+    },
+    {
+      "host": "heartbeat.cindy.com.cn",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "heartbeat (cn)",
+      "officialParent": "cindy.com.cn"
+    },
+    {
+      "host": "hotfix.cindy.app",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "更新/hotfix CDN (global;cdnBaseUrl 带 /cindy 路径)",
+      "officialParent": "cindy.app"
+    },
+    {
+      "host": "hotfix.cindy.com.cn",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "更新/hotfix CDN (cn)",
+      "officialParent": "cindy.com.cn"
+    },
+    {
+      "host": "mobile-update.cindy.app",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "mobile update server (global)",
+      "officialParent": "cindy.app"
+    },
+    {
+      "host": "mobile-update.cindy.com.cn",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "mobile update server (cn)",
+      "officialParent": "cindy.com.cn"
+    },
+    {
+      "host": "model-access.cindy.app",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "model-access server (global)",
+      "officialParent": "cindy.app"
+    },
+    {
+      "host": "model-access.cindy.com.cn",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "model-access server (cn)",
+      "officialParent": "cindy.com.cn"
+    },
+    {
+      "host": "oauth-broker.cindy.app",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "oauth broker (global)",
+      "officialParent": "cindy.app"
+    },
+    {
+      "host": "oauth-broker.cindy.com.cn",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "oauth broker (cn)",
+      "officialParent": "cindy.com.cn"
+    },
+    {
+      "host": "oss.cindy.app",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "oss-server (global)",
+      "officialParent": "cindy.app"
+    },
+    {
+      "host": "oss.cindy.com.cn",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "oss-server (cn)",
+      "officialParent": "cindy.com.cn"
+    },
+    {
+      "host": "plugin.cindy.app",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "plugin-server (global)",
+      "officialParent": "cindy.app"
+    },
+    {
+      "host": "plugin.cindy.com.cn",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "plugin-server (cn)",
+      "officialParent": "cindy.com.cn"
+    },
+    {
+      "host": "protocol.xd.cn",
+      "category": "official-cindy",
+      "disposition": "doc-only",
+      "note": "makecindy/cindy-protocol 归档仓域名(文档/引用)"
+    },
+    {
+      "host": "protocol.xd.com",
+      "category": "official-cindy",
+      "disposition": "doc-only",
+      "note": "makecindy/cindy-protocol 归档仓域名(文档/引用)"
+    },
+    {
+      "host": "slack-hook.cindy.app",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "托管 Slack hook WS(跨区共享 cindy.app)",
+      "officialParent": "cindy.app"
+    },
+    {
+      "host": "telegram-hook.cindy.app",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "托管 Telegram hook WS(跨区共享 cindy.app)",
+      "officialParent": "cindy.app"
+    },
+    {
+      "host": "voice.cindy.app",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "voice server (global)",
+      "officialParent": "cindy.app"
+    },
+    {
+      "host": "voice.cindy.com.cn",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "voice server (cn)",
+      "officialParent": "cindy.com.cn"
+    },
+    {
+      "host": "x-hook.cindy.app",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "托管 X hook WS(跨区共享 cindy.app)",
+      "officialParent": "cindy.app"
+    },
+    {
+      "host": "xd-skillhub.cindy.app",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "skillhub-server (global)",
+      "officialParent": "cindy.app"
+    },
+    {
+      "host": "xd-skillhub.cindy.com.cn",
+      "category": "official-cindy",
+      "disposition": "official-runtime",
+      "note": "skillhub-server (cn)",
+      "officialParent": "cindy.com.cn"
+    },
+    {
+      "host": "freeworkbuddy.me",
+      "category": "selfhost-deployment",
+      "disposition": "selfhost-runtime",
+      "note": "FreeWorkBuddy 独立发行部署域(蓝图首域名)。当前仅出现在 distributionProfile 的占位法律 URL 与 embedded 信任根;Phase 2 部署服务后启用真实解析。",
+      "allowSubdomains": false
+    },
+    {
+      "host": "cindy-mobile.local",
+      "category": "test-stub",
+      "disposition": "test-stub",
+      "note": "本地移动开发桩域名(manualEntry: 仅出现在代码扩展名之外的文档/注释)",
+      "manualEntry": true
+    },
+    {
+      "host": "example.co.uk",
+      "category": "test-stub",
+      "disposition": "test-stub",
+      "note": "保留示例域变体(allowSubdomains 覆盖其子域)",
+      "allowSubdomains": true
+    },
+    {
+      "host": "example.com",
+      "category": "test-stub",
+      "disposition": "test-stub",
+      "note": "RFC 2606 保留示例域(文档/类型示例,allowSubdomains 覆盖其子域)",
+      "allowSubdomains": true
+    },
+    {
+      "host": "example.dev",
+      "category": "test-stub",
+      "disposition": "test-stub",
+      "note": "RFC 2606 保留示例域变体(allowSubdomains 覆盖其子域)",
+      "allowSubdomains": true
+    },
+    {
+      "host": "invalid",
+      "category": "test-stub",
+      "disposition": "test-stub",
+      "note": "RFC 2606 保留 TLD;所有 *.invalid 均为测试/文档桩,allowSubdomains 覆盖",
+      "allowSubdomains": true
+    },
+    {
+      "host": "xdt-maker-mobile.local",
+      "category": "test-stub",
+      "disposition": "test-stub",
+      "note": "本地移动开发桩域名"
+    }
+  ]
+}

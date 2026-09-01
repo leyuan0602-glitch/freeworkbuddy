@@ -60,6 +60,14 @@ jobs:
       - name: Check endpoint literals
         run: pnpm check:endpoints
 
+      # FreeWorkBuddy self-hosting 工作流 A(蓝图 §3.2):网络契约 registry 与
+      # 外部域名台账双向校验,秒级返回,放在 typecheck / 单测之前快速失败。
+      - name: Check network contract registry
+        run: pnpm check:network-contract
+
+      - name: Check self-host egress inventory
+        run: pnpm check:self-host-egress
+
       # i18n 三道静态门禁：key 结构一致性、品牌名收口、术语表一致性。
       # 都是纯文件扫描、秒级返回，放在耗时的 typecheck / 单测之前快速失败。
       - name: Check i18n key consistency
