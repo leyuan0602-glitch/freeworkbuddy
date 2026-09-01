@@ -179,3 +179,31 @@ test('distribution profile 构建期 env 名在 forge 与 vite 两处一致', ()
     'main 入口未把发行 identity 传入 regionUserData(独立发行 userData 分库失效)',
   );
 });
+
+test('mobile distribution-profile.cjs 镜像与 maker-shared 单点逐字段一致', () => {
+  // app.config.js 在 Expo config 求值链(CJS)里无法 import maker-shared TS,
+  // 按「CJS 镜像 + 镜像测试锁定」模式同步。单点翻转漏改镜像 → 立即红灯。
+  const mobileMirror = readSource('apps/mobile/scripts/lib/distribution-profile.cjs');
+  const profileSource = readSource('packages/maker-shared/src/distributionProfile.ts');
+  const pick = (source, name) => {
+    const block = new RegExp(`${name}[^\\[\\{]*[\\[\\{]([\\s\\S]*?)[\\]\\}]`).exec(source);
+    assert.ok(block, `${name} 字面量未找到`);
+    return [...block[1].matchAll(/'([^']+)'/g)].map((m) => m[1]).filter((v) => v.includes('.'));
+  };
+  // Mobile 身份字段:ios/android bundle 与 scheme 必须与 maker-shared 的
+  // SELFHOST_FREEWORKBUDDY_PROFILE.brand 完全一致。
+  const mobileIds = pick(mobileMirror, 'SELFHOST_FREEWORKBUDDY_MOBILE');
+  for (const id of ['me.freeworkbuddy.ios', 'me.freeworkbuddy.android']) {
+    assert.ok(mobileIds.includes(id), `mobile 镜像缺少 ${id}`);
+    assert.ok(profileSource.includes(id), `maker-shared 单点缺少 ${id}(镜像测试两侧都要在)`);
+  }
+  assert.ok(
+    mobileMirror.includes("scheme: 'freeworkbuddy'") && profileSource.includes("urlSchemes: Object.freeze(['freeworkbuddy'])"),
+    '独立发行 scheme 两侧不一致',
+  );
+  // 官方 distributionId 集合同步。
+  for (const id of ['cindy-cn', 'cindy-global', 'cindy-dev']) {
+    assert.ok(mobileMirror.includes(`'${id}'`), `mobile 镜像缺官方 id ${id}`);
+    assert.ok(profileSource.includes(`'${id}'`), `maker-shared 单点缺官方 id ${id}`);
+  }
+});

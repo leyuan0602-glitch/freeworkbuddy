@@ -20,6 +20,7 @@ const appJson = require('./app.json');
 const {
   loadMobileClientBuildEnv,
 } = require('../../scripts/shared/client-endpoint-build-env.cjs');
+const { resolveMobileDistribution } = require('./scripts/lib/distribution-profile.cjs');
 
 // 本地 Xcode / Simulator 与 self-host release 共用同一份地区构建配置。EAS 云端看不到
 // gitignored 的真文件,因此不启用 CINDY_USE_LOCAL_REGION_CONFIG 时继续走 eas.json / EAS env。
@@ -204,6 +205,10 @@ function withNativeAuthPlugins(plugins, env) {
 module.exports = (context = {}) => {
   const baseConfig = context.config ?? appJson.expo;
   const region = resolveRegion();
+  // 发行身份(工作流 B):缺省 = 官方路径,行为与历史逐字节一致;
+  // freeworkbuddy-selfhost → 独立 app 身份 + 隐含自建 OTA 语义(下方 selfHosted 分支)。
+  // 官方 id 与 region 矛盾 / 未知 id 直接抛错,不回退。
+  const distribution = resolveMobileDistribution(process.env);
   const mobileBuildEnv = resolveMobileBuildEnv();
   const mobileBundleEnv = {
     ...mobileBuildEnv,
@@ -233,16 +238,34 @@ module.exports = (context = {}) => {
   // xdtProductionEnv 是既有 Expo config / runtime fingerprint 的一部分。对端清单
   // 基址只需通过上面的 EXPO_PUBLIC_* 环境变量进入 Metro bundle；不要把它追加到
   // extra，否则本次纯 JS 登录路由会无意要求一次冷构建，并切断旧 runtime 的 OTA 链。
-  const selfHosted = process.env.EXPO_PUBLIC_XDT_OTA_SELFHOST === '1';
+  // 独立发行(freeworkbuddy-selfhost)隐含自建 OTA 语义:全新 app 身份无存量 OTA
+  // 用户,原生 updates 配置(占位 URL + NEVER + anti-bricking)与 IS_OTA_SELFHOST
+  // 运行时判定所需 env(EXPO_PUBLIC_XDT_OTA_SELFHOST)由发布链同时提供。
+  const selfHosted =
+    process.env.EXPO_PUBLIC_XDT_OTA_SELFHOST === '1' || distribution.kind === 'selfhost';
   const usesLocalRegionConfig =
     process.env.CINDY_USE_LOCAL_REGION_CONFIG === '1';
-  const usesRegionConfig = selfHosted || usesLocalRegionConfig;
-  const regionBuildConfig = usesRegionConfig
-    ? loadRegionBuildConfig(region, { selfHosted })
-    : null;
+  const usesRegionConfig =
+    selfHosted ||
+    usesLocalRegionConfig ||
+    distribution.kind === 'selfhost';
+  // 独立发行不走官方地区分包投影(self-host-regions.json 是 cn/global 地区配置;
+  // 独立发行身份来自 distribution-profile 镜像,TapDB/Google 一律不烘焙)。
+  const regionBuildConfig =
+    usesRegionConfig && distribution.kind === 'official'
+      ? loadRegionBuildConfig(region, { selfHosted })
+      : null;
   const builtInRegional = REGION_CONFIG[region];
   let regional = builtInRegional;
-  if (regionBuildConfig) {
+  if (distribution.kind === 'selfhost') {
+    // 独立发行:身份来自 distribution-profile 镜像(不经 self-host-regions.json ——
+    // 那是官方地区的分包投影;独立发行身份在 maker-shared 单点 + 本文件镜像锁定)。
+    regional = {
+      scheme: distribution.identity.scheme,
+      iosBundleIdentifier: distribution.identity.iosBundleIdentifier,
+      androidPackage: distribution.identity.androidPackage,
+    };
+  } else if (regionBuildConfig) {
     // 身份字段留空(仅本地构建可能走到——自建线已在装载时硬校验)回落内置 dev 身份。
     const iosBundleIdentifier =
       regionBuildConfig.iosBundleId?.trim() || builtInRegional.iosBundleIdentifier;
@@ -300,7 +323,16 @@ module.exports = (context = {}) => {
       ...(easProjectId ? { eas: { projectId: easProjectId } } : {}),
       cindy: {
         authRegion: region,
-        ...(usesRegionConfig
+        ...(distribution.kind === 'selfhost'
+          ? {
+              // 独立发行投影:capabilityDefaults 全关(endpoint manifest embedded)、
+              // telemetry/update disabled 由运行时消费端按 distributionId 判定;
+              // TapDB / Google 一律不烘焙(telemetryPolicy=disabled)。
+              distributionId: distribution.distributionId,
+              regionConfigSource: 'distribution-profile',
+            }
+          : {}),
+        ...(usesRegionConfig && distribution.kind === 'official'
           ? {
               regionConfigSource: 'self-host-regions',
               // TapDB 留空(仅本地构建可能)时不烘焙该键:运行时 mobileTapdb 视为

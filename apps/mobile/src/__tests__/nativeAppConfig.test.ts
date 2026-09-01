@@ -24,6 +24,7 @@ const managedEnvKeys = [
   'EXPO_PUBLIC_CINDY_GOOGLE_IOS_URL_SCHEME',
   'CINDY_USE_LOCAL_REGION_CONFIG',
   'CINDY_SELF_HOST_REGIONS_FILE',
+  'CINDY_DISTRIBUTION_PROFILE',
 ];
 let previousEnv: Record<string, string | undefined>;
 const temporaryDirs: string[] = [];
@@ -693,5 +694,64 @@ end
     );
     expect(upgradedPodfile.match(/arm64 simulator stub linkage v3/g)).toHaveLength(1);
     expect(plugin.injectPostInstallHooks(upgradedPodfile)).toBe(upgradedPodfile);
+  });
+
+  // ---- 独立发行(工作流 B,PR 5:Mobile identity)----
+
+  it('distribution self-host: independent app identity without official TapDB / Google / regions json', () => {
+    const appJson = JSON.parse(
+      readFileSync(resolve(process.cwd(), 'app.json'), 'utf8'),
+    );
+    const buildConfig = require(resolve(process.cwd(), 'app.config.js'));
+
+    process.env.CINDY_DISTRIBUTION_PROFILE = 'freeworkbuddy-selfhost';
+    // 不得要求 self-host-regions.json(独立发行不走官方地区分包投影)。
+    const selfhost = buildConfig({ config: appJson.expo });
+    expect(selfhost.scheme).toBe('freeworkbuddy');
+    expect(selfhost.ios.bundleIdentifier).toBe('me.freeworkbuddy.ios');
+    expect(selfhost.android.package).toBe('me.freeworkbuddy.android');
+    expect(selfhost.extra.cindy.distributionId).toBe('freeworkbuddy-selfhost');
+    expect(selfhost.extra.cindy.regionConfigSource).toBe('distribution-profile');
+    // telemetry disabled:不烘焐 TapDB / Google(镜像 capabilityDefaults 全关)。
+    expect(selfhost.extra.cindy.tapdb).toBeUndefined();
+    expect(selfhost.extra.cindy.google).toBeUndefined();
+    expect(selfhost.plugins).not.toContainEqual(
+      expect.arrayContaining(['@react-native-google-signin/google-signin']),
+    );
+    // 隐含自建 OTA 语义:占位 URL + NEVER + anti-bricking 关闭(真实地址运行时覆写)。
+    expect(selfhost.updates).toMatchObject({
+      url: 'https://selfhost.invalid/manifest',
+      checkAutomatically: 'NEVER',
+      disableAntiBrickingMeasures: true,
+    });
+    // 官方 app id 不得出现在独立发行 resolved config。
+    expect(JSON.stringify(selfhost)).not.toContain('com.xd.cindy');
+  });
+
+  it('distribution official id must match region env; unknown id rejected', () => {
+    const appJson = JSON.parse(
+      readFileSync(resolve(process.cwd(), 'app.json'), 'utf8'),
+    );
+    const buildConfig = require(resolve(process.cwd(), 'app.config.js'));
+
+    process.env.CINDY_DISTRIBUTION_PROFILE = 'cindy-cn';
+    process.env.EXPO_PUBLIC_CINDY_AUTH_REGION = 'global';
+    expect(() => buildConfig({ config: appJson.expo })).toThrow(/mismatch/i);
+
+    process.env.CINDY_DISTRIBUTION_PROFILE = 'no-such-profile';
+    delete process.env.EXPO_PUBLIC_CINDY_AUTH_REGION;
+    expect(() => buildConfig({ config: appJson.expo })).toThrow(/Unknown distribution profile/);
+  });
+
+  it('distribution env unset keeps official resolved config byte-identical (no cold update)', () => {
+    const appJson = JSON.parse(
+      readFileSync(resolve(process.cwd(), 'app.json'), 'utf8'),
+    );
+    const buildConfig = require(resolve(process.cwd(), 'app.config.js'));
+
+    process.env.EXPO_PUBLIC_CINDY_AUTH_REGION = 'global';
+    const config = buildConfig({ config: appJson.expo });
+    expect(config.ios.bundleIdentifier).toBe('com.xd.cindy');
+    expect(config.extra.cindy).not.toHaveProperty('distributionId');
   });
 });
