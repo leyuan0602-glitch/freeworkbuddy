@@ -881,6 +881,7 @@ import {
 import { effectiveXdGatewayBaseUrl } from './model-access/effectiveEndpoint.js';
 import { isLocalDbOwnerCurrent } from './appSessionPolicy.js';
 import { getAppCapabilities, registerAppCapabilitiesIpc, requireAppCapability } from './appCapabilities.js';
+import { installNoEgressAudit, isNoEgressAuditRequested, scheduleNoEgressAuditQuit } from './noEgressAudit.js';
 import {
   activeOwnerScopeKey,
   beginAppSessionBoundary,
@@ -7921,7 +7922,21 @@ function cleanupLegacyDevShortcut(): Promise<void> {
   });
 }
 
-app.on('ready', async () => {
+// ⚠️ 用 whenReady() 而非 app.on('ready')：本文件由 index.ts 的**动态 import** 加载,
+// 18MB bootstrap chunk 的加载/求值期间 Chromium 的 ready 事件可能已经发出——
+// on('ready') 晚于事件注册则回调永不执行(packaged 包静默卡死,无窗口无日志);
+// whenReady() 是缓存 Promise,ready 已发也能 resolve,消除竞态(dev 不拆包无此问题,
+// 历史上 packaged smoke 仅在 release 机人工跑,未曾暴露)。
+void app.whenReady().then(async () => {
+  // no-egress 审计(工作流 C):验收模式下在一切网络初始化之前挂请求采集,
+  // settle 窗口结束后写报告退出。正常发行(未带 flag/env)零开销。
+  if (isNoEgressAuditRequested()) {
+    // 验收模式的可见性:audit 分支必须能在纯 stderr 上确认(packaged 下 logger
+    // 可能因后续卡点未 flush,验收不能依赖文件日志)。
+    process.stderr.write(`[no-egress] audit branch entered (argv=${JSON.stringify(process.argv.slice(1, 4))})\n`);
+    installNoEgressAudit();
+    scheduleNoEgressAuditQuit();
+  }
   try {
     const releaseGate = parseIOSSimulatorReleaseGateArgs(process.argv);
     if (releaseGate.enabled) {
@@ -9375,14 +9390,8 @@ function gitSafetyWire() {
  */
 export async function bootstrapElectron(): Promise<void> {
   // Side effects already in motion from module-level code above.
-  // Return a promise that resolves when app is ready.
-  return new Promise<void>((resolve) => {
-    if (app.isReady()) {
-      resolve();
-    } else {
-      app.once('ready', () => resolve());
-    }
-  });
+  // Return a promise that resolves when app is ready (whenReady 消除与动态加载的竞态)。
+  await app.whenReady();
 }
 
 // ---------------------------------------------------------------------------

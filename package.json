@@ -117,6 +117,7 @@
     "check:endpoints": "node scripts/check-endpoint-literals.mjs",
     "check:network-contract": "node scripts/check-network-contract-registry.mjs",
     "check:self-host-egress": "node scripts/check-self-host-egress.mjs",
+    "smoke:no-egress": "node apps/desktop/scripts/no-egress-smoke.mjs",
     "check:dev-docs": "node --test scripts/__tests__/dev-docs-contract.test.mjs",
     "check:dco": "node scripts/check-dco.mjs",
     "dco:install-hook": "node scripts/install-dco-hook.mjs",
