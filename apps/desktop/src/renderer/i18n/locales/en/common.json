@@ -9970,15 +9970,13 @@
       "search": "Search skills",
       "clearSearch": "Clear skill search",
       "noSearchResults": "No matching skills found",
-      "browseTitle": "Browse Skill Hub",
-      "browseDesc": "Discover and install more skills",
-      "catalog": "SkillHub",
       "catalogFiltersAria": "SkillHub categories",
       "catalogFilter": {
         "public": "Public",
         "organization": "Organization",
         "mine": "Managed"
       },
+      "catalogMore": "More",
       "catalogEmpty": "No skills in this category",
       "local": "Local Skills",
       "localEmpty": "No local skills yet",

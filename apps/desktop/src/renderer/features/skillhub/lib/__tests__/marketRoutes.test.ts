@@ -69,6 +69,17 @@ describe('market route scope', () => {
     expect(listSource).not.toContain("setVisibility('available')");
     expect(hookSource).toContain("initialVisibility: Visibility = 'all'");
   });
+
+  it('uses a compact More entry for the full market and aligns import with plugin actions', () => {
+    const homeSource = readFileSync(resolve(skillhubDir, 'SkillhubHomeView.tsx'), 'utf8');
+
+    expect(homeSource).not.toContain('skillhub.home.browseTitle');
+    expect(homeSource).not.toContain('skillhub.home.browseDesc');
+    expect(homeSource).not.toContain("title={t('skillhub.home.catalog')}");
+    expect(homeSource).toContain("t('skillhub.home.catalogMore')");
+    expect(homeSource).toContain('headerActions={(');
+    expect(homeSource).toContain('plugin-management-action-trigger');
+  });
 });
 
 describe('market management copy and errors', () => {

@@ -9,7 +9,7 @@
  * 三块都是整页内容卡片/列表;首页是栈底,自身无返回。
  */
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -18,7 +18,6 @@ import {
   Download,
   Package,
   SquareTerminal,
-  Store,
   Upload,
   type LucideIcon,
 } from 'lucide-react';
@@ -251,6 +250,25 @@ export function SkillhubHomeView({
       clearSearchLabel={t('skillhub.home.clearSearch')}
       embedded={embedded}
       onSelectTab={onSelectCatalogTab}
+      headerActions={(
+        <button
+          type="button"
+          onClick={() => void handleImportSkill()}
+          disabled={importBusy}
+          className={cn(
+            'plugin-management-action-trigger inline-flex h-9 shrink-0 items-center gap-2 rounded-full border border-[var(--border-default)]',
+            'bg-[var(--surface-elevated)] px-3.5 text-12 font-medium text-[var(--text-primary)] shadow-[var(--plugin-card-shadow)]',
+            'transition-[background-color,border-color,transform] duration-150 ease-out',
+            'hover:border-[var(--text-tertiary)] hover:bg-[var(--surface-hover-soft)] active:scale-[0.98]',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]',
+            'disabled:cursor-not-allowed disabled:opacity-50',
+          )}
+          aria-label={t('skillhub.home.importAria')}
+        >
+          <Upload size={14} strokeWidth={1.8} aria-hidden="true" />
+          <span className="plugin-management-action-label">{t('skillhub.home.import')}</span>
+        </button>
+      )}
     >
       <main
         className={cn(
@@ -258,8 +276,8 @@ export function SkillhubHomeView({
           embedded ? 'bg-transparent' : 'bg-[var(--surface)]',
         )}
       >
-        <PluginManagementPage className="gap-10">
-          <header className="plugin-motion-page-header flex items-start justify-between gap-4">
+        <PluginManagementPage className="gap-8">
+          <header className="plugin-motion-page-header flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0 pt-1">
               <h1 className="text-28 font-medium leading-tight text-[var(--text-primary)]">
                 {t('skillhub.home.title')}
@@ -272,91 +290,51 @@ export function SkillhubHomeView({
                 )}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => void handleImportSkill()}
-              disabled={importBusy}
-              className={cn(
-                'mt-1 inline-flex h-9 shrink-0 items-center gap-2 rounded-full border border-[var(--border-default)]',
-                'bg-[var(--surface-elevated)] px-3.5 text-12 font-medium text-[var(--text-primary)] shadow-[var(--plugin-card-shadow)]',
-                'transition-[background-color,border-color,transform] duration-150 ease-out',
-                'hover:border-[var(--text-tertiary)] hover:bg-[var(--surface-hover-soft)] active:scale-[0.98]',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]',
-                'disabled:cursor-not-allowed disabled:opacity-50',
-              )}
-              aria-label={t('skillhub.home.importAria')}
-            >
-              <Upload size={14} strokeWidth={1.8} aria-hidden="true" />
-              <span>{t('skillhub.home.import')}</span>
-            </button>
+            {marketAllowed ? (
+              <div
+                className="flex min-w-0 max-w-full flex-wrap items-center justify-end gap-1"
+                role="group"
+                aria-label={t('skillhub.home.catalogFiltersAria')}
+              >
+                {homeMarketFilters.map((filter) => (
+                  <button
+                    key={filter}
+                    type="button"
+                    aria-pressed={marketFilter === filter}
+                    onClick={() => {
+                      setPreviewSkill(null);
+                      setMarketFilter(filter);
+                    }}
+                    className={cn(
+                      'shrink-0 select-none rounded-full px-3.5 py-2 text-12 transition-colors duration-150',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]',
+                      marketFilter === filter
+                        ? 'bg-[var(--surface-chip)] font-medium text-[var(--text-primary)]'
+                        : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover-soft)] hover:text-[var(--text-primary)]',
+                    )}
+                  >
+                    {t(`skillhub.home.catalogFilter.${filter}`)}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={openMarket}
+                  className={cn(
+                    'inline-flex shrink-0 items-center gap-1 rounded-full px-3.5 py-2 text-12 text-[var(--text-secondary)]',
+                    'transition-colors duration-150 hover:bg-[var(--surface-hover-soft)] hover:text-[var(--text-primary)]',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]',
+                  )}
+                >
+                  {t('skillhub.home.catalogMore')}
+                  <ChevronRight size={13} strokeWidth={1.8} aria-hidden="true" />
+                </button>
+              </div>
+            ) : null}
           </header>
 
-          {/* ① Skill Hub 入口 → 完整 Market 浏览页(仅市场可见账号) */}
-          {marketAllowed && !normalizedQuery ? (
-            <button
-              type="button"
-              onClick={openMarket}
-              className={cn(
-                'plugin-motion-page-section',
-                'group flex items-center gap-4 rounded-[12px] border-[0.5px] border-[var(--border-default)]',
-                'bg-[var(--surface-elevated)] px-5 py-4 text-left shadow-[var(--plugin-card-shadow)]',
-                'transition-[background-color,border-color,transform] duration-150 ease-out',
-                'hover:-translate-y-0.5 hover:border-[var(--text-tertiary)]',
-                'active:translate-y-0 active:scale-[0.992]',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]',
-              )}
-            >
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-[22%] border-[0.5px] border-[var(--border-default)] bg-[var(--surface-elevated)] shadow-[var(--plugin-card-shadow)]">
-                <Store size={20} className="text-[var(--msg-assistant-text)]" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-[var(--msg-assistant-text)]">
-                  {t('skillhub.home.browseTitle')}
-                </span>
-                <span className="block text-xs text-[var(--cmd-palette-item-meta)]">
-                  {t('skillhub.home.browseDesc')}
-                </span>
-              </span>
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-default)] text-[var(--text-secondary)] transition-[background-color,color,transform] group-hover:translate-x-0.5 group-hover:bg-[var(--surface-chip)] group-hover:text-[var(--text-primary)] group-active:translate-x-0 group-active:scale-95">
-                <ChevronRight size={16} strokeWidth={1.8} />
-              </span>
-            </button>
-          ) : null}
-
-          {/* ② 云端目录摘要(仅市场可见账号) */}
+          {/* ① 云端目录摘要(仅市场可见账号) */}
           {marketAllowed && (!normalizedQuery || catalogItems.length > 0 || marketLoading) ? (
             <section className="plugin-motion-page-section min-w-0">
-              <SkillSectionHeading
-                title={t('skillhub.home.catalog')}
-                count={catalogItems.length}
-              >
-                <div
-                  className="flex min-w-0 max-w-full items-center gap-1"
-                  role="group"
-                  aria-label={t('skillhub.home.catalogFiltersAria')}
-                >
-                  {homeMarketFilters.map((filter) => (
-                    <button
-                      key={filter}
-                      type="button"
-                      aria-pressed={marketFilter === filter}
-                      onClick={() => {
-                        setPreviewSkill(null);
-                        setMarketFilter(filter);
-                      }}
-                      className={cn(
-                        'shrink-0 select-none rounded-full px-3.5 py-2 text-12 transition-colors duration-150',
-                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]',
-                        marketFilter === filter
-                          ? 'bg-[var(--surface-chip)] font-medium text-[var(--text-primary)]'
-                          : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover-soft)] hover:text-[var(--text-primary)]',
-                      )}
-                    >
-                      {t(`skillhub.home.catalogFilter.${filter}`)}
-                    </button>
-                  ))}
-                </div>
-              </SkillSectionHeading>
               {(marketLoading || !marketResponseCurrent) && catalogItems.length === 0 ? (
                 // 占位骨架:与真实卡片同栅格、同行数、同高度,内容到位后原地替换不跳动。
                 <div className={PLUGIN_MANAGEMENT_CARD_GRID_CLASS} aria-hidden>
@@ -421,7 +399,7 @@ export function SkillhubHomeView({
             </section>
           ) : null}
 
-          {/* ③ 本地技能 */}
+          {/* ② 本地技能 */}
           {!normalizedQuery || visibleLocalCount > 0 ? (
             <section className="plugin-motion-page-section min-w-0">
               <SkillSectionHeading title={t('skillhub.home.local')} count={visibleLocalCount} />
@@ -552,11 +530,9 @@ export function SkillhubHomeView({
 function SkillSectionHeading({
   title,
   count,
-  children,
 }: {
   title: string;
   count: number;
-  children?: ReactNode;
 }) {
   return (
     <div className="mb-5 flex items-end justify-between gap-4">
@@ -564,7 +540,6 @@ function SkillSectionHeading({
         <h2 className="text-20 font-medium leading-tight text-[var(--text-primary)]">{title}</h2>
         <span className="text-13 text-[var(--text-tertiary)]">{count}</span>
       </div>
-      {children}
     </div>
   );
 }

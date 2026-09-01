@@ -9948,15 +9948,13 @@
       "search": "スキルを検索",
       "clearSearch": "スキル検索をクリア",
       "noSearchResults": "一致するスキルが見つかりません",
-      "browseTitle": "Skill Hub を見る",
-      "browseDesc": "もっと多くのスキルを見つけてインストール",
-      "catalog": "SkillHub",
       "catalogFiltersAria": "SkillHub カテゴリ",
       "catalogFilter": {
         "public": "公開",
         "organization": "組織",
         "mine": "管理対象"
       },
+      "catalogMore": "もっと見る",
       "catalogEmpty": "このカテゴリにはスキルがありません",
       "local": "ローカルスキル",
       "localEmpty": "ローカルスキルはまだありません",
