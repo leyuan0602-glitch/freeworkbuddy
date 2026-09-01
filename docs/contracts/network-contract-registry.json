@@ -1,0 +1,2999 @@
+{
+  "version": 1,
+  "updatedAt": "2026-09-01",
+  "purpose": [
+    "FreeWorkBuddy self-hosting 工作流 A(蓝图 §3.2):本仓全部生产网络调用的机器可读契约清单。",
+    "服务端仓(freeworkbuddy-server)按本清单重建契约;no-egress 审计与 CI 门禁以本清单为准。",
+    "第一轮只复刻已观察语义,不改 wire protocol;新增字段必须 append-only。"
+  ],
+  "confidenceScale": {
+    "A": "有 runtime parser(zod / protocol package)和测试覆盖,响应形状由代码强校验。",
+    "B": "有 typed consumer(TS 泛型/接口),但没有严格 runtime parser。",
+    "C": "只从 UI、错误处理或调用方式推断,尚未有 characterization test。"
+  },
+  "conventions": {
+    "pathTemplate": "path 中的 ':name' 段对应源码模板字符串的 ${...} 插值;'?query' 不写入 path,记在 queryNotes。",
+    "baseUrl": "除注明 sourceLiteral 外,完整 URL = 对应 endpoint manifest 字段(endpoint 由 config/endpoint*.json 提供) + path。",
+    "auth": "bearer = Authorization: Bearer <access token>;none = 匿名;refresh-token / presigned-url 等特殊机制在 auth 字段内说明。",
+    "methodScope": "method 以当前源码调用为准;服务端第一轮必须同时接受客户端在错误重试中表现出的现有语义,不改语义。"
+  },
+  "capabilities": {
+    "canUseAccount": "账号 / 登录 / 资料 / 删除(authApiBaseUrl)",
+    "canUseDeviceLink": "设备发现、WS relay、媒体、push(deviceLinkApiBaseUrl)",
+    "canUseManagedModels": "托管模型凭据与目录(modelAccessApiBaseUrl)",
+    "canUseManagedVoice": "托管语音 session / refine(voiceApiBaseUrl)",
+    "canUseOAuthBroker": "第三方 OAuth exchange / feature flags(oauthBrokerApiBaseUrl)",
+    "canUploadPublicAssets": "公开资产(头像)直传预签名(ossApiBaseUrl)",
+    "canUseHostedTelegramHook": "托管 Telegram hook(telegramHookWsUrl)",
+    "canUseHostedXHook": "托管 X hook(xHookWsUrl)",
+    "canUseHostedSlackHook": "托管 Slack hook(slackHookWsUrl)",
+    "canUseFeedback": "GitHub issue 反馈代理(githubApiBaseUrl)",
+    "canUseSkillHubCloud": "SkillHub 市场 / 发布(skillhubApiBaseUrl)",
+    "canUsePluginMarket": "Plugin 市场目录与下载(pluginApiBaseUrl)",
+    "canPublishPlugins": "Plugin 发布通道(pluginApiBaseUrl)",
+    "canSendHeartbeat": "匿名在线心跳(heartbeatUrl)",
+    "canCheckDesktopUpdates": "Desktop 更新 manifest / artifact(cdnBaseUrl)",
+    "canCheckMobileUpdates": "Mobile 整包发现(mobileUpdateBaseUrl)",
+    "canSendTelemetry": "TapDB 埋点(官方发行版专属,self-host 关闭)",
+    "canUploadLogs": "日志上传(构建注入,不在 endpoint manifest)"
+  },
+  "routes": [
+    {
+      "id": "auth.providers.get",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/auth/providers",
+      "callsites": [
+        "packages/auth-client/src/client.ts#getProviders"
+      ],
+      "auth": "none",
+      "requestSchema": null,
+      "responseSchema": "providersSchema(zod, packages/auth-client/src/client.ts)",
+      "errorCodes": [
+        "network",
+        "http-status",
+        "schema-mismatch(抛 ServerApiError)"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "A",
+      "protocolVersion": null,
+      "tests": [
+        "packages/auth-client/src/__tests__/client.test.ts"
+      ],
+      "notes": "登录页 provider 列表发现。"
+    },
+    {
+      "id": "auth.discovery",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/auth/discovery",
+      "callsites": [
+        "packages/auth-client/src/client.ts#requestLoginDiscovery"
+      ],
+      "auth": "none",
+      "requestSchema": "identifier + locale",
+      "responseSchema": "discoverySchema(zod)",
+      "errorCodes": [
+        "network",
+        "http-status",
+        "schema-mismatch"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only 语义(不产生凭证)",
+      "sideEffects": "none",
+      "confidence": "A",
+      "protocolVersion": null,
+      "tests": [
+        "packages/auth-client/src/__tests__/client.test.ts"
+      ],
+      "notes": "按登录标识符发现可用验证方式。"
+    },
+    {
+      "id": "auth.sso.discovery",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/auth/sso/discovery",
+      "callsites": [
+        "packages/auth-client/src/client.ts#discoverSsoOrganization"
+      ],
+      "auth": "none",
+      "requestSchema": "email 域名探测",
+      "responseSchema": "ssoDiscoverySchema(zod)",
+      "errorCodes": [
+        "network",
+        "http-status",
+        "schema-mismatch"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "A",
+      "protocolVersion": null,
+      "tests": [
+        "packages/auth-client/src/__tests__/client.test.ts"
+      ],
+      "notes": "组织 SSO 发现;self-host 单 realm 下由 distribution 禁用 peer 侧。"
+    },
+    {
+      "id": "auth.requestCode",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/auth/:channel/request-code",
+      "callsites": [
+        "packages/auth-client/src/client.ts#requestCode"
+      ],
+      "auth": "none",
+      "requestSchema": "target + locale(:channel ∈ email|phone)",
+      "responseSchema": "requestCodeOutcomeSchema(zod)",
+      "errorCodes": [
+        "rate-limited",
+        "invalid-target",
+        "network",
+        "schema-mismatch"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定;服务端限流",
+      "idempotency": "no(每次产生新 challenge)",
+      "sideEffects": "创建 verification challenge;发送邮件/短信",
+      "confidence": "A",
+      "protocolVersion": null,
+      "tests": [
+        "packages/auth-client/src/__tests__/client.test.ts"
+      ],
+      "notes": "验证码请求;服务端必须限流 + 单次消费。"
+    },
+    {
+      "id": "auth.verifyCode",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/auth/:channel/verify-code",
+      "callsites": [
+        "packages/auth-client/src/client.ts#verifyCode"
+      ],
+      "auth": "none",
+      "requestSchema": "target + code + transaction",
+      "responseSchema": "loginOutcomeSchema(zod)",
+      "errorCodes": [
+        "invalid-code",
+        "expired",
+        "too-many-attempts",
+        "schema-mismatch"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "no(消费 challenge)",
+      "sideEffects": "签发 token;消费 verification challenge",
+      "confidence": "A",
+      "protocolVersion": null,
+      "tests": [
+        "packages/auth-client/src/__tests__/client.test.ts"
+      ]
+    },
+    {
+      "id": "auth.token",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/auth/token",
+      "callsites": [
+        "packages/auth-client/src/client.ts#loginWithPassword"
+      ],
+      "auth": "none",
+      "requestSchema": "credential payload",
+      "responseSchema": "loginOutcomeSchema(zod)",
+      "errorCodes": [
+        "invalid-credential",
+        "schema-mismatch"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "no",
+      "sideEffects": "签发 access/refresh token",
+      "confidence": "A",
+      "protocolVersion": null,
+      "tests": [
+        "packages/auth-client/src/__tests__/client.test.ts",
+        "packages/auth-client/fixtures/__tests__/loginScenarios.test.ts"
+      ]
+    },
+    {
+      "id": "auth.desktopCallbackPoll",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/auth/desktop/callback/poll",
+      "callsites": [
+        "packages/auth-client/src/client.ts#pollHostedDesktopCallback"
+      ],
+      "auth": "none(以一次性 poll 凭据定位授权码)",
+      "requestSchema": "hosted callback poll 参数",
+      "responseSchema": "loginOutcomeSchema(zod)",
+      "errorCodes": [
+        "pending",
+        "expired",
+        "schema-mismatch"
+      ],
+      "timeoutMs": null,
+      "retry": "轮询语义(pending 重试)",
+      "idempotency": "no(授权码一次性)",
+      "sideEffects": "消费授权码",
+      "confidence": "A",
+      "protocolVersion": null,
+      "tests": [
+        "packages/auth-client/src/__tests__/client.test.ts"
+      ],
+      "notes": "authDesktopCallbackUrl 托管回调链路的取码轮询;authDesktopCallbackUrl 为空时走 loopback PKCE,不调用本 route。"
+    },
+    {
+      "id": "auth.socialCallback",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/auth/social/:provider",
+      "callsites": [
+        "packages/auth-client/src/client.ts#loginWithSocial"
+      ],
+      "auth": "none",
+      "requestSchema": "social authorization payload(:provider ∈ apple|google|wechat)",
+      "responseSchema": "loginOutcomeSchema(zod)",
+      "errorCodes": [
+        "invalid-grant",
+        "schema-mismatch"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "no",
+      "sideEffects": "签发 token",
+      "confidence": "A",
+      "protocolVersion": null,
+      "tests": [
+        "packages/auth-client/src/__tests__/client.test.ts"
+      ]
+    },
+    {
+      "id": "auth.selectAccount",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/auth/select-account",
+      "callsites": [
+        "packages/auth-client/src/client.ts#selectAccount"
+      ],
+      "auth": "bearer",
+      "requestSchema": "account selector",
+      "responseSchema": "loginOutcomeSchema(zod)",
+      "errorCodes": [
+        "forbidden",
+        "schema-mismatch"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "no",
+      "sideEffects": "切换/签发会话",
+      "confidence": "A",
+      "protocolVersion": null,
+      "tests": [
+        "packages/auth-client/src/__tests__/client.test.ts"
+      ]
+    },
+    {
+      "id": "auth.binding.requestCode",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/auth/binding/request-code",
+      "callsites": [
+        "packages/auth-client/src/client.ts#requestBindingCode"
+      ],
+      "auth": "bearer",
+      "requestSchema": "binding target + locale",
+      "responseSchema": "bindingRequestCodeSchema(zod)",
+      "errorCodes": [
+        "already-bound",
+        "rate-limited",
+        "schema-mismatch"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "no(创建 challenge)",
+      "sideEffects": "创建 verification challenge;发送邮件/短信",
+      "confidence": "A",
+      "protocolVersion": null,
+      "tests": [
+        "packages/auth-client/src/__tests__/client.test.ts"
+      ]
+    },
+    {
+      "id": "auth.binding.verify",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/auth/binding/verify",
+      "callsites": [
+        "packages/auth-client/src/client.ts#verifyBinding"
+      ],
+      "auth": "bearer",
+      "requestSchema": "binding code",
+      "responseSchema": "loginOutcomeSchema(zod)",
+      "errorCodes": [
+        "invalid-code",
+        "expired",
+        "schema-mismatch"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "no(消费 challenge)",
+      "sideEffects": "绑定标识符;消费 challenge",
+      "confidence": "A",
+      "protocolVersion": null,
+      "tests": [
+        "packages/auth-client/src/__tests__/client.test.ts"
+      ]
+    },
+    {
+      "id": "auth.refresh",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/auth/refresh",
+      "callsites": [
+        "packages/auth-client/src/client.ts#refreshSession"
+      ],
+      "auth": "refresh-token(opaque,非 Bearer access)",
+      "requestSchema": "refresh token",
+      "responseSchema": "loginOutcomeSchema(zod)",
+      "errorCodes": [
+        "invalid-refresh-token",
+        "reuse-detected",
+        "schema-mismatch"
+      ],
+      "timeoutMs": null,
+      "retry": "不得对同一 refresh token 并发重试;reuse 即失效",
+      "idempotency": "no(轮换 refresh token)",
+      "sideEffects": "轮换 refresh token;签发新 access token",
+      "confidence": "A",
+      "protocolVersion": null,
+      "tests": [
+        "packages/auth-client/src/__tests__/client.test.ts"
+      ],
+      "notes": "服务端必须实现 rotation + reuse detection(蓝图 §3.9)。"
+    },
+    {
+      "id": "auth.account.get",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/auth/account",
+      "callsites": [
+        "packages/auth-client/src/client.ts#getAccount"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "accountSchema(zod)",
+      "errorCodes": [
+        "unauthorized",
+        "schema-mismatch"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "A",
+      "protocolVersion": null,
+      "tests": [
+        "packages/auth-client/src/__tests__/client.test.ts"
+      ]
+    },
+    {
+      "id": "auth.account.exchange",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/auth/account/exchange",
+      "callsites": [
+        "packages/auth-client/src/client.ts#exchangeAccountToken"
+      ],
+      "auth": "bearer",
+      "requestSchema": "target account/realm",
+      "responseSchema": "exchangeSchema(zod)",
+      "errorCodes": [
+        "forbidden",
+        "schema-mismatch"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "no",
+      "sideEffects": "签发目标账号 token",
+      "confidence": "A",
+      "protocolVersion": null,
+      "tests": [
+        "packages/auth-client/src/__tests__/client.test.ts"
+      ],
+      "notes": "跨账号/跨 realm 切换;self-host 单 realm 下 distribution 层禁用入口。"
+    },
+    {
+      "id": "auth.account.refresh",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/auth/account/refresh",
+      "callsites": [
+        "packages/auth-client/src/client.ts#refreshAccountToken"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "refreshSchema(zod)",
+      "errorCodes": [
+        "unauthorized",
+        "schema-mismatch"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "no",
+      "sideEffects": "签发账号级 token",
+      "confidence": "A",
+      "protocolVersion": null,
+      "tests": [
+        "packages/auth-client/src/__tests__/client.test.ts"
+      ]
+    },
+    {
+      "id": "auth.account.logout",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/auth/account/logout",
+      "callsites": [
+        "packages/auth-client/src/client.ts#accountLogout"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "status literal(zod)",
+      "errorCodes": [
+        "unauthorized"
+      ],
+      "timeoutMs": null,
+      "retry": "可安全重试",
+      "idempotency": "yes",
+      "sideEffects": "吊销账号会话",
+      "confidence": "A",
+      "protocolVersion": null,
+      "tests": [
+        "packages/auth-client/src/__tests__/client.test.ts"
+      ]
+    },
+    {
+      "id": "auth.deletion.availability",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/auth/account/deletion",
+      "callsites": [
+        "packages/auth-client/src/client.ts#getAccountDeletionAvailability"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "accountDeletionAvailabilitySchema(zod)",
+      "errorCodes": [
+        "unauthorized",
+        "blocked",
+        "schema-mismatch"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "A",
+      "protocolVersion": null,
+      "tests": [
+        "packages/auth-client/src/__tests__/client.test.ts"
+      ],
+      "notes": "账号删除状态机(availability → challenge → confirm → status)。"
+    },
+    {
+      "id": "auth.deletion.challenge",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/auth/account/deletion/challenge",
+      "callsites": [
+        "packages/auth-client/src/client.ts#requestAccountDeletionChallenge"
+      ],
+      "auth": "bearer",
+      "requestSchema": "locale",
+      "responseSchema": "accountDeletionChallengeSchema(zod)",
+      "errorCodes": [
+        "unauthorized",
+        "rate-limited",
+        "schema-mismatch"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "no(创建 challenge)",
+      "sideEffects": "创建删除 challenge;发送验证码",
+      "confidence": "A",
+      "protocolVersion": null,
+      "tests": [
+        "packages/auth-client/src/__tests__/client.test.ts"
+      ]
+    },
+    {
+      "id": "auth.deletion.confirm",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/auth/account/deletion/confirm",
+      "callsites": [
+        "packages/auth-client/src/client.ts#confirmAccountDeletion"
+      ],
+      "auth": "bearer",
+      "requestSchema": "challengeId + receiptToken + code + acknowledged",
+      "responseSchema": "accountDeletionStatusSchema(zod)",
+      "errorCodes": [
+        "invalid-code",
+        "challenge-mismatch",
+        "schema-mismatch"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "no",
+      "sideEffects": "启动账号删除流程;签发 receipt",
+      "confidence": "A",
+      "protocolVersion": null,
+      "tests": [
+        "packages/auth-client/src/__tests__/client.test.ts"
+      ]
+    },
+    {
+      "id": "auth.deletion.status",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/auth/account/deletion/status",
+      "callsites": [
+        "packages/auth-client/src/client.ts#getAccountDeletionStatus"
+      ],
+      "auth": "receipt-token(query 参数定位,非 Bearer)",
+      "requestSchema": "receiptToken",
+      "responseSchema": "accountDeletionStatusSchema(zod)",
+      "errorCodes": [
+        "not-found",
+        "schema-mismatch"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "A",
+      "protocolVersion": null,
+      "tests": [
+        "packages/auth-client/src/__tests__/client.test.ts"
+      ]
+    },
+    {
+      "id": "auth.ssoVerification.requestCode",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/auth/sso/verification/request-code",
+      "callsites": [
+        "packages/auth-client/src/client.ts#requestSsoVerificationCode"
+      ],
+      "auth": "bearer",
+      "requestSchema": "verification target",
+      "responseSchema": "ssoVerificationSchema(zod)",
+      "errorCodes": [
+        "rate-limited",
+        "schema-mismatch"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "no(创建 challenge)",
+      "sideEffects": "创建 challenge;发送验证码",
+      "confidence": "A",
+      "protocolVersion": null,
+      "tests": [
+        "packages/auth-client/src/__tests__/client.test.ts"
+      ]
+    },
+    {
+      "id": "auth.ssoVerification.verify",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/auth/sso/verification/verify",
+      "callsites": [
+        "packages/auth-client/src/client.ts#verifySsoVerification"
+      ],
+      "auth": "bearer",
+      "requestSchema": "code",
+      "responseSchema": "ssoVerificationVerifySchema(zod)",
+      "errorCodes": [
+        "invalid-code",
+        "expired",
+        "schema-mismatch"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "no(消费 challenge)",
+      "sideEffects": "消费 challenge;更新 SSO verification 状态",
+      "confidence": "A",
+      "protocolVersion": null,
+      "tests": [
+        "packages/auth-client/src/__tests__/client.test.ts"
+      ]
+    },
+    {
+      "id": "auth.me.get",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/me",
+      "callsites": [
+        "packages/auth-client/src/client.ts#getMe"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "meResponseSchema(zod)",
+      "errorCodes": [
+        "unauthorized",
+        "schema-mismatch"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "A",
+      "protocolVersion": null,
+      "tests": [
+        "packages/auth-client/src/__tests__/client.test.ts"
+      ]
+    },
+    {
+      "id": "auth.me.profilePatch",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http",
+      "method": "PATCH",
+      "path": "/api/me/profile",
+      "callsites": [
+        "apps/desktop/src/main/authManager.ts#updateServerProfile",
+        "apps/desktop/src/main/profileEdit.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": "profile fields(avatar publicUrl 等)",
+      "responseSchema": "typed consumer,无 runtime parser",
+      "errorCodes": [
+        "unauthorized",
+        "validation"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "yes(幂等覆盖)",
+      "sideEffects": "更新 profile",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "notes": "调用在 desktop main 侧,auth-client 只承载类型(types.ts 注释);服务端需支持 PATCH 部分更新。"
+    },
+    {
+      "id": "auth.logout",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/auth/logout",
+      "callsites": [
+        "packages/auth-client/src/client.ts#logout"
+      ],
+      "auth": "bearer",
+      "requestSchema": "{}",
+      "responseSchema": "z.object({ status: 'ok' })",
+      "errorCodes": [
+        "unauthorized"
+      ],
+      "timeoutMs": null,
+      "retry": "可安全重试",
+      "idempotency": "yes",
+      "sideEffects": "吊销当前会话的 refresh family",
+      "confidence": "A",
+      "protocolVersion": null,
+      "tests": [
+        "packages/auth-client/src/__tests__/client.test.ts"
+      ]
+    },
+    {
+      "id": "auth.authorize.social",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http-redirect",
+      "method": "GET",
+      "path": "/api/auth/social/:provider/authorize",
+      "callsites": [
+        "packages/auth-client/src/client.ts#buildAuthorizeUrl"
+      ],
+      "auth": "none(系统浏览器打开)",
+      "requestSchema": "query: client_type, device_id, redirect_uri, code_challenge, code_challenge_method=S256, client_state",
+      "responseSchema": "302 → provider 授权页;回调携带 code",
+      "errorCodes": [
+        "provider-side"
+      ],
+      "timeoutMs": null,
+      "retry": "用户发起",
+      "idempotency": "n/a(浏览器导航)",
+      "sideEffects": "开始 OAuth/PKCE 授权",
+      "confidence": "A",
+      "protocolVersion": null,
+      "tests": [
+        "packages/auth-client/src/__tests__/client.test.ts"
+      ],
+      "notes": "URL builder 纯函数;query 契约已由测试锁定。"
+    },
+    {
+      "id": "auth.authorize.sso",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http-redirect",
+      "method": "GET",
+      "path": "/api/auth/sso/:provider/authorize",
+      "callsites": [
+        "packages/auth-client/src/client.ts#buildAuthorizeUrl"
+      ],
+      "auth": "none(系统浏览器打开)",
+      "requestSchema": "query 同 auth.authorize.social",
+      "responseSchema": "302 → IdP 授权页",
+      "errorCodes": [
+        "provider-side"
+      ],
+      "timeoutMs": null,
+      "retry": "用户发起",
+      "idempotency": "n/a",
+      "sideEffects": "开始 SSO/PKCE 授权",
+      "confidence": "A",
+      "protocolVersion": null,
+      "tests": [
+        "packages/auth-client/src/__tests__/client.test.ts"
+      ]
+    },
+    {
+      "id": "auth.captchaPage",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http-redirect",
+      "method": "GET",
+      "path": "/captcha/turnstile",
+      "callsites": [
+        "packages/auth-client/src/types.ts#CAPTCHA_CHALLENGE_PAGE_PATH"
+      ],
+      "auth": "none(浏览器打开)",
+      "requestSchema": "由登录链路拼接的挑战参数",
+      "responseSchema": "Cloudflare Turnstile 挑战页",
+      "errorCodes": [
+        "provider-side"
+      ],
+      "timeoutMs": null,
+      "retry": "用户重试",
+      "idempotency": "n/a",
+      "sideEffects": "人机验证",
+      "confidence": "A",
+      "protocolVersion": null,
+      "tests": [
+        "packages/auth-client/src/__tests__/client.test.ts"
+      ],
+      "notes": "托管验证码页;self-host Auth Core 需自行决定验证码 provider 并保持页面路径或替换协商。",
+      "pathValidation": "source-literal",
+      "sourceLiteral": "/captcha/turnstile"
+    },
+    {
+      "id": "deviceLink.wsRelay",
+      "owner": "device-link",
+      "capability": "canUseDeviceLink",
+      "transport": "websocket",
+      "method": "WS",
+      "path": "/api/device-link/ws",
+      "callsites": [
+        "apps/desktop/src/main/device-link/index.ts#WS_PATH",
+        "packages/device-link/src/client.ts"
+      ],
+      "auth": "bearer(Upgrade 握手 Authorization 头)",
+      "requestSchema": "envelope { v, kind, id?, src?, dst?, payload? }",
+      "responseSchema": "同 envelope;src 由 server 覆盖",
+      "errorCodes": [
+        "relay-error code 集合见 protocol.ts"
+      ],
+      "timeoutMs": null,
+      "retry": "断线重连由 client 侧调度",
+      "idempotency": "n/a",
+      "sideEffects": "建立 presence;路由帧",
+      "confidence": "A",
+      "protocolVersion": "1 (@cindy/device-link-protocol PROTOCOL_VERSION)",
+      "tests": [
+        "packages/device-link/src/__tests__/client.test.ts",
+        "packages/device-link/src/__tests__/transport.test.ts"
+      ],
+      "notes": "kind 全集与路由/控制语义见 packages/device-link-protocol/src/protocol.ts:hello, hello-ack, presence-set, presence-changed, ping, pong, notify, link-open, link-accept, link-close, invoke, invoke-result, push, relay-error;MAX_FRAME_BYTES=2MiB。"
+    },
+    {
+      "id": "deviceLink.devices.list",
+      "owner": "device-link",
+      "capability": "canUseDeviceLink",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/device-link/devices",
+      "callsites": [
+        "apps/desktop/src/main/device-link/index.ts#serverApiFetch",
+        "apps/desktop/src/main/device-link/ipc.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "DeviceDirectoryResponse(typed)",
+      "errorCodes": [
+        "unauthorized",
+        "network"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [
+        "apps/desktop/src/main/device-link/__tests__/dispatchWeakNetwork.test.ts"
+      ]
+    },
+    {
+      "id": "deviceLink.devices.rename",
+      "owner": "device-link",
+      "capability": "canUseDeviceLink",
+      "transport": "http",
+      "method": "PATCH",
+      "path": "/api/device-link/devices/:deviceId",
+      "callsites": [
+        "apps/desktop/src/main/device-link/ipc.ts#handleRenameDevice"
+      ],
+      "auth": "bearer",
+      "requestSchema": "{ name }",
+      "responseSchema": "{ deviceId, name, manualName }",
+      "errorCodes": [
+        "INVALID_PARAMS",
+        "unauthorized"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "yes(覆盖命名)",
+      "sideEffects": "更新设备名",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "deviceLink.devices.delete",
+      "owner": "device-link",
+      "capability": "canUseDeviceLink",
+      "transport": "http",
+      "method": "DELETE",
+      "path": "/api/device-link/devices/:deviceId",
+      "callsites": [
+        "apps/desktop/src/main/device-link/ipc.ts#handleDeleteDevice"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "{ deviceId, deleted }",
+      "errorCodes": [
+        "INVALID_PARAMS",
+        "unauthorized"
+      ],
+      "timeoutMs": null,
+      "retry": "可安全重试",
+      "idempotency": "yes",
+      "sideEffects": "吊销设备",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "deviceLink.media.presignPut",
+      "owner": "device-link",
+      "capability": "canUseDeviceLink",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/device-link/media/presign-put",
+      "callsites": [
+        "apps/desktop/src/main/device-link/mediaTransfer.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": "media put 描述(mime/size 等)",
+      "responseSchema": "presigned PUT URL + object key(typed)",
+      "errorCodes": [
+        "unauthorized",
+        "too-large"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "no(新 presign)",
+      "sideEffects": "签发短期 presigned URL",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [
+        "apps/desktop/src/main/device-link/__tests__/mediaTransfer.test.ts"
+      ]
+    },
+    {
+      "id": "deviceLink.media.presignGet",
+      "owner": "device-link",
+      "capability": "canUseDeviceLink",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/device-link/media/presign-get",
+      "callsites": [
+        "apps/desktop/src/main/device-link/mediaTransfer.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": "media get 描述(object key)",
+      "responseSchema": "presigned GET URL(typed)",
+      "errorCodes": [
+        "unauthorized",
+        "not-found"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "no(新 presign)",
+      "sideEffects": "签发短期 presigned URL",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [
+        "apps/desktop/src/main/device-link/__tests__/mediaTransfer.test.ts"
+      ]
+    },
+    {
+      "id": "deviceLink.media.delete",
+      "owner": "device-link",
+      "capability": "canUseDeviceLink",
+      "transport": "http",
+      "method": "DELETE",
+      "path": "/api/device-link/media",
+      "callsites": [
+        "apps/desktop/src/main/device-link/mediaTransfer.ts#DELETE_PATH"
+      ],
+      "auth": "bearer",
+      "requestSchema": "对象标识",
+      "responseSchema": "typed",
+      "errorCodes": [
+        "unauthorized",
+        "not-found"
+      ],
+      "timeoutMs": null,
+      "retry": "可安全重试",
+      "idempotency": "yes",
+      "sideEffects": "删除媒体对象",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [
+        "apps/desktop/src/main/device-link/__tests__/mediaTransfer.test.ts"
+      ]
+    },
+    {
+      "id": "deviceLink.pushToken.register",
+      "owner": "device-link",
+      "capability": "canUseDeviceLink",
+      "transport": "http",
+      "method": "PUT",
+      "path": "/api/device-link/push-token",
+      "callsites": [
+        "apps/mobile/src/notifications/pushNotifications.ts#PUSH_TOKEN_PATH"
+      ],
+      "auth": "bearer(与 WS 同源)",
+      "requestSchema": "device push token(APNs provider)",
+      "responseSchema": "typed",
+      "errorCodes": [
+        "unauthorized",
+        "validation"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "yes(覆盖注册)",
+      "sideEffects": "注册/更新 push 注册",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [
+        "apps/mobile/src/__tests__/pushNotificationsRealm.test.ts"
+      ],
+      "notes": "蓝图 seed 写 POST,实际源码为 PUT(/api/device-link/push-token,Bearer 鉴权与 WS 同源);以源码为准。"
+    },
+    {
+      "id": "deviceLink.pushToken.revoke",
+      "owner": "device-link",
+      "capability": "canUseDeviceLink",
+      "transport": "http",
+      "method": "DELETE",
+      "path": "/api/device-link/push-token",
+      "callsites": [
+        "apps/mobile/src/notifications/pushNotifications.ts#PUSH_TOKEN_PATH"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "typed",
+      "errorCodes": [
+        "unauthorized"
+      ],
+      "timeoutMs": 3000,
+      "retry": "可安全重试;失败进 pendingUnregister tombstone",
+      "idempotency": "yes",
+      "sideEffects": "吊销 push 注册",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [
+        "apps/mobile/src/__tests__/pushNotificationsRealm.test.ts"
+      ]
+    },
+    {
+      "id": "modelAccess.credentials.get",
+      "owner": "model-access",
+      "capability": "canUseManagedModels",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/model-access/credentials",
+      "callsites": [
+        "apps/desktop/src/main/model-access/index.ts#fetchCredentials"
+      ],
+      "auth": "bearer(自动 401 refresh)",
+      "requestSchema": null,
+      "responseSchema": "CredentialsPayload(typed)",
+      "errorCodes": [
+        "unauthorized",
+        "no-entitlement"
+      ],
+      "timeoutMs": null,
+      "retry": "同步循环带退避",
+      "idempotency": "read-only 语义",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [
+        "apps/desktop/src/main/model-access/__tests__/credentialsSync.test.ts"
+      ],
+      "notes": "凭据(短期网关 key + gateway endpoint)成对下发;响应同时携带 xd gateway endpoint,清单不再承载网关端点。"
+    },
+    {
+      "id": "modelAccess.credentials.rotate",
+      "owner": "model-access",
+      "capability": "canUseManagedModels",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/model-access/credentials/rotate",
+      "callsites": [
+        "apps/desktop/src/main/model-access/index.ts#rotateCredentials"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "CredentialsPayload(typed)",
+      "errorCodes": [
+        "unauthorized",
+        "rate-limited"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "no(旧凭据失效)",
+      "sideEffects": "轮换网关凭据",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [
+        "apps/desktop/src/main/model-access/__tests__/credentialsSync.test.ts"
+      ],
+      "pathValidation": "source-literal",
+      "sourceLiteral": "/rotate",
+      "notes": " path 由 CREDENTIALS_PATH 常量 + \"/rotate\" 拼接,无法用单一字面量表达,以 sourceLiteral 锚定。"
+    },
+    {
+      "id": "modelAccess.models.catalog",
+      "owner": "model-access",
+      "capability": "canUseManagedModels",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/model-access/models",
+      "callsites": [
+        "apps/desktop/src/main/model-access/mediaModels.ts#MODEL_ACCESS_MODELS_PATH"
+      ],
+      "auth": "bearer",
+      "requestSchema": "query: schemaVersion=5",
+      "responseSchema": "catalog v5(schemaVersion 严格校验,不符即拒绝)",
+      "errorCodes": [
+        "unauthorized",
+        "schema-mismatch"
+      ],
+      "timeoutMs": null,
+      "retry": "保留 last valid list",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "A",
+      "protocolVersion": "catalog schemaVersion=5",
+      "tests": [
+        "apps/desktop/src/main/model-access/__tests__/mediaModels.test.ts",
+        "apps/desktop/src/main/model-access/__tests__/modelsSyncRefresh.test.ts"
+      ]
+    },
+    {
+      "id": "voice.session.create",
+      "owner": "voice",
+      "capability": "canUseManagedVoice",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/voice/sessions",
+      "callsites": [
+        "apps/desktop/src/main/voice-input/CindyVoiceSessionClient.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": "session 请求(typed)",
+      "responseSchema": "CindyVoiceAsrSession(typed)",
+      "errorCodes": [
+        "unauthorized",
+        "quota"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "no(新 session)",
+      "sideEffects": "创建托管语音 session",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "voice.session.refine",
+      "owner": "voice",
+      "capability": "canUseManagedVoice",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/voice/sessions/:sessionId/refine",
+      "callsites": [
+        "apps/desktop/src/main/voice-input/CindyVoiceSessionClient.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": "refine 音频负载",
+      "responseSchema": "refine 结果(typed)",
+      "errorCodes": [
+        "unauthorized",
+        "session-expired",
+        "quota"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "no",
+      "sideEffects": "消费语音 refine 配额",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "notes": "query: provider=<refinerProvider>。"
+    },
+    {
+      "id": "voice.session.refineWarmup",
+      "owner": "voice",
+      "capability": "canUseManagedVoice",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/voice/sessions/:sessionId/refine-warmup",
+      "callsites": [
+        "apps/desktop/src/main/voice-input/CindyVoiceSessionClient.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": "warmup 负载",
+      "responseSchema": "typed",
+      "errorCodes": [
+        "unauthorized",
+        "session-expired"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "no",
+      "sideEffects": "预热 session",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "oss.presignPut",
+      "owner": "oss",
+      "capability": "canUploadPublicAssets",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/oss/presign-put",
+      "callsites": [
+        "apps/desktop/src/main/ossPublicUpload.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": "{ scene, contentType, size }",
+      "responseSchema": "presigned PUT + publicUrl(部分字段校验)",
+      "errorCodes": [
+        "NOT_AUTHENTICATED",
+        "presign-failed",
+        "put-failed"
+      ],
+      "timeoutMs": 15000,
+      "retry": "由调用方决定",
+      "idempotency": "no(新 presign)",
+      "sideEffects": "签发短期 presigned URL",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "notes": "presign 15s 超时;PUT 直传按 5MB 上限放宽。当前场景:头像上传,presigned PUT 至第三方对象存储(域名由 presign 响应给出,不入 manifest)。"
+    },
+    {
+      "id": "oauthBroker.featureFlags",
+      "owner": "oauth-broker",
+      "capability": "canUseOAuthBroker",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/user/feature-flags",
+      "callsites": [
+        "apps/desktop/src/main/authManager.ts#syncCanaryFlagAfterAuth"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "feature flags(typed;响应非法保留旧值)",
+      "errorCodes": [
+        "unauthorized",
+        "invalid-payload(保留旧值)"
+      ],
+      "timeoutMs": null,
+      "retry": "登录态落地后异步触发",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "feedback.createIssue",
+      "owner": "feedback",
+      "capability": "canUseFeedback",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/github/issues",
+      "callsites": [
+        "apps/desktop/src/main/github-issue/index.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": "issue 内容(标题/正文/元数据)",
+      "responseSchema": "issue 引用(typed)",
+      "errorCodes": [
+        "unauthorized",
+        "rate-limited"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "no(创建 issue)",
+      "sideEffects": "在反馈仓创建 GitHub issue(server 代理)",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "feedback.myIssues",
+      "owner": "feedback",
+      "capability": "canUseFeedback",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/github/issues/mine",
+      "callsites": [
+        "apps/desktop/src/main/github-issue/myIssuesRuntime.ts#PLATFORM_MY_ISSUES_PATH"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "issue 列表(typed;消费方做了未知形状兜底)",
+      "errorCodes": [
+        "unauthorized",
+        "not-signed-in"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "heartbeat.post",
+      "owner": "heartbeat",
+      "capability": "canSendHeartbeat",
+      "transport": "http",
+      "method": "POST",
+      "path": "{heartbeatUrl}/heartbeat",
+      "callsites": [
+        "packages/heartbeat-client/src/client.ts"
+      ],
+      "auth": "none(匿名,不携带用户标识)",
+      "requestSchema": "匿名心跳计数 payload",
+      "responseSchema": "忽略 body;仅看 HTTP status",
+      "errorCodes": [
+        "静默:网络错/5xx/超时只 warn 不抛"
+      ],
+      "timeoutMs": null,
+      "retry": "无重试/无退避,下个 tick 重来",
+      "idempotency": "yes",
+      "sideEffects": "server 侧计数",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "sourceLiteral": "/heartbeat",
+      "pathValidation": "source-literal",
+      "notes": "path 由 endpoint + '/heartbeat' 拼接;设计契约注明与 apps/heartbeat-server 配套。"
+    },
+    {
+      "id": "skillhub.skills.list",
+      "owner": "skillhub",
+      "capability": "canUseSkillHubCloud",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/skills-hub/skills/list",
+      "callsites": [
+        "apps/desktop/src/main/skillhub/marketService.ts#listSkills"
+      ],
+      "auth": "bearer(skillhubApiFetch)",
+      "requestSchema": "{ installedSkills } + query",
+      "responseSchema": "{ items, total }(typed)",
+      "errorCodes": [
+        "unauthorized",
+        "ServerApiError code"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only 语义",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [
+        "apps/desktop/src/main/skillhub/__tests__/hubApi.test.ts"
+      ]
+    },
+    {
+      "id": "skillhub.skills.search",
+      "owner": "skillhub",
+      "capability": "canUseSkillHubCloud",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/skills-hub/skills",
+      "callsites": [
+        "apps/desktop/src/main/skillhub/marketService.ts#listSkills"
+      ],
+      "auth": "bearer",
+      "requestSchema": "query: page/q/category/sort/order/scope",
+      "responseSchema": "{ items, total }(typed)",
+      "errorCodes": [
+        "unauthorized"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [
+        "apps/desktop/src/main/skillhub/__tests__/hubApi.test.ts"
+      ]
+    },
+    {
+      "id": "skillhub.skills.detail",
+      "owner": "skillhub",
+      "capability": "canUseSkillHubCloud",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/skills-hub/skills/:slug",
+      "callsites": [
+        "apps/desktop/src/main/skillhub/marketService.ts#info"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "HubSkillInfoForDesktop | { deleted: true }(typed)",
+      "errorCodes": [
+        "unauthorized",
+        "not-found"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "skillhub.skills.update",
+      "owner": "skillhub",
+      "capability": "canUseSkillHubCloud",
+      "transport": "http",
+      "method": "PATCH",
+      "path": "/api/skills-hub/skills/:slug",
+      "callsites": [
+        "apps/desktop/src/main/skillhub/marketService.ts#updatePublished"
+      ],
+      "auth": "bearer",
+      "requestSchema": "UpdatePublishedFields",
+      "responseSchema": "unknown(typed 兜底)",
+      "errorCodes": [
+        "unauthorized",
+        "forbidden"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "yes(覆盖更新)",
+      "sideEffects": "更新已发布 Skill",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "skillhub.skills.delete",
+      "owner": "skillhub",
+      "capability": "canUseSkillHubCloud",
+      "transport": "http",
+      "method": "DELETE",
+      "path": "/api/skills-hub/skills/:slug",
+      "callsites": [
+        "apps/desktop/src/main/skillhub/marketService.ts#deletePublished"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "unknown(typed 兜底)",
+      "errorCodes": [
+        "unauthorized",
+        "forbidden"
+      ],
+      "timeoutMs": null,
+      "retry": "可安全重试",
+      "idempotency": "yes",
+      "sideEffects": "删除已发布 Skill",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "skillhub.skills.files",
+      "owner": "skillhub",
+      "capability": "canUseSkillHubCloud",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/skills-hub/skills/:slug/files",
+      "callsites": [
+        "apps/desktop/src/main/skillhub/marketService.ts#getPublishedFiles"
+      ],
+      "auth": "bearer",
+      "requestSchema": "query: version?",
+      "responseSchema": "{ slug, version, files[] }(typed)",
+      "errorCodes": [
+        "unauthorized",
+        "not-found"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "skillhub.skills.file",
+      "owner": "skillhub",
+      "capability": "canUseSkillHubCloud",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/skills-hub/skills/:slug/file",
+      "callsites": [
+        "apps/desktop/src/main/skillhub/marketService.ts#readPublishedFile"
+      ],
+      "auth": "bearer",
+      "requestSchema": "query: path, version?",
+      "responseSchema": "{ path, size, language, truncated, content }(typed)",
+      "errorCodes": [
+        "unauthorized",
+        "not-found"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "skillhub.skills.versions",
+      "owner": "skillhub",
+      "capability": "canUseSkillHubCloud",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/skills-hub/skills/:slug/versions",
+      "callsites": [
+        "apps/desktop/src/main/skillhub/marketService.ts#listPublishedVersions"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "unknown[](typed 兜底)",
+      "errorCodes": [
+        "unauthorized",
+        "not-found"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "skillhub.skills.unpublish",
+      "owner": "skillhub",
+      "capability": "canUseSkillHubCloud",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/skills-hub/skills/:slug/unpublish",
+      "callsites": [
+        "apps/desktop/src/main/skillhub/marketService.ts#unpublishPublished"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "unknown(typed 兜底)",
+      "errorCodes": [
+        "unauthorized",
+        "forbidden"
+      ],
+      "timeoutMs": null,
+      "retry": "可安全重试",
+      "idempotency": "yes",
+      "sideEffects": "下架 Skill",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "skillhub.skills.setVisibility",
+      "owner": "skillhub",
+      "capability": "canUseSkillHubCloud",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/skills-hub/skills/:slug/set-visibility",
+      "callsites": [
+        "apps/desktop/src/main/skillhub/marketService.ts#setPublishedVisibility"
+      ],
+      "auth": "bearer",
+      "requestSchema": "{ visibility, teamSlug?, visibleSlugs? }",
+      "responseSchema": "unknown(typed 兜底)",
+      "errorCodes": [
+        "unauthorized",
+        "forbidden"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "yes(覆盖设置)",
+      "sideEffects": "更新可见性",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "skillhub.skills.visibility",
+      "owner": "skillhub",
+      "capability": "canUseSkillHubCloud",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/skills-hub/skills/:slug/visibility",
+      "callsites": [
+        "apps/desktop/src/main/skillhub/marketService.ts#getPublishedVisibility"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "{ sharedTeams?, visibleDepts? }(typed)",
+      "errorCodes": [
+        "unauthorized",
+        "forbidden"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "skillhub.skills.scan",
+      "owner": "skillhub",
+      "capability": "canUseSkillHubCloud",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/skills-hub/skills/:slug/scan",
+      "callsites": [
+        "apps/desktop/src/main/skillhub/marketService.ts#getScanStatus"
+      ],
+      "auth": "bearer",
+      "requestSchema": "query: version?",
+      "responseSchema": "{ status, gates?, scorecard? }(typed)",
+      "errorCodes": [
+        "unauthorized",
+        "not-found"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "notes": "Cache-Control: no-store。"
+    },
+    {
+      "id": "skillhub.skills.batchDetail",
+      "owner": "skillhub",
+      "capability": "canUseSkillHubCloud",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/skills-hub/skills/batch-detail",
+      "callsites": [
+        "apps/desktop/src/main/skillhub/marketService.ts#fetchSkillhubBatchDetail",
+        "apps/desktop/src/main/skillhub/installService.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": "{ slugs }",
+      "responseSchema": "SkillhubBatchDetailResponse(typed)",
+      "errorCodes": [
+        "unauthorized"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定;失败仅 warn 不阻断安装",
+      "idempotency": "read-only 语义",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "skillhub.categories",
+      "owner": "skillhub",
+      "capability": "canUseSkillHubCloud",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/skills-hub/categories",
+      "callsites": [
+        "apps/desktop/src/main/skillhub/marketService.ts#listCategories"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "category tree(typed)",
+      "errorCodes": [
+        "unauthorized"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "skillhub.users.teams",
+      "owner": "skillhub",
+      "capability": "canUseSkillHubCloud",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/skills-hub/users/teams",
+      "callsites": [
+        "apps/desktop/src/main/skillhub/marketService.ts#listUserTeams"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "teams[](含 myRole)(typed)",
+      "errorCodes": [
+        "unauthorized"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "skillhub.users.departments",
+      "owner": "skillhub",
+      "capability": "canUseSkillHubCloud",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/skills-hub/users/departments",
+      "callsites": [
+        "apps/desktop/src/main/skillhub/marketService.ts#getMyDepts"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "SkillhubUserDepartmentsResponse(typed)",
+      "errorCodes": [
+        "unauthorized"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "skillhub.users.published",
+      "owner": "skillhub",
+      "capability": "canUseSkillHubCloud",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/skills-hub/users/published",
+      "callsites": [
+        "apps/desktop/src/main/skillhub/marketService.ts#listSkills(mine)"
+      ],
+      "auth": "bearer",
+      "requestSchema": "query: page/q/category/sort/order",
+      "responseSchema": "{ items, total }(typed)",
+      "errorCodes": [
+        "unauthorized"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "skillhub.publish.init",
+      "owner": "skillhub",
+      "capability": "canUseSkillHubCloud",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/skills-hub/skills/publish/init",
+      "callsites": [
+        "apps/desktop/src/main/skillhub/publishService.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": "{ slug, version? }",
+      "responseSchema": "InitResponse(含 uploadUrl)(typed)",
+      "errorCodes": [
+        "unauthorized",
+        "version-conflict(触发 versionRaceRetries)",
+        "forbidden"
+      ],
+      "timeoutMs": null,
+      "retry": "version race 重试循环",
+      "idempotency": "no(新 upload transaction)",
+      "sideEffects": "创建发布事务;签发 upload URL",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "skillhub.publish.commit",
+      "owner": "skillhub",
+      "capability": "canUseSkillHubCloud",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/skills-hub/skills/publish/commit",
+      "callsites": [
+        "apps/desktop/src/main/skillhub/publishService.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": "commit 负载(uploadId + 元数据)",
+      "responseSchema": "publish 结果(typed)",
+      "errorCodes": [
+        "unauthorized",
+        "upload-incomplete",
+        "scan-failed"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "no(事务收尾)",
+      "sideEffects": "提交发布;触发扫描",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "skillhub.publish.uploadArtifact",
+      "owner": "skillhub",
+      "capability": "canUseSkillHubCloud",
+      "transport": "object-storage",
+      "method": "PUT",
+      "path": "{init 响应的 uploadUrl}",
+      "callsites": [
+        "apps/desktop/src/main/skillhub/publishService.ts"
+      ],
+      "auth": "presigned-url",
+      "requestSchema": "application/zip 打包内容",
+      "responseSchema": "HTTP status",
+      "errorCodes": [
+        "network",
+        "4xx/5xx"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "yes(同 URL 覆盖)",
+      "sideEffects": "写入对象存储",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "pathValidation": "none",
+      "notes": "目标 URL 来自 publish/init 响应;域名不入 manifest。"
+    },
+    {
+      "id": "pluginMarket.list",
+      "owner": "plugin-market",
+      "capability": "canUsePluginMarket",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/plugins",
+      "callsites": [
+        "apps/desktop/src/main/plugin-market/api.ts"
+      ],
+      "auth": "bearer(authorizedFetch)",
+      "requestSchema": "query: 搜索/分页参数",
+      "responseSchema": "raw → 上层解析(unknown)",
+      "errorCodes": [
+        "unauthorized",
+        "ServerApiError"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "pluginMarket.detail",
+      "owner": "plugin-market",
+      "capability": "canUsePluginMarket",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/plugins/:pluginId",
+      "callsites": [
+        "apps/desktop/src/main/plugin-market/api.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "raw → 上层解析(unknown)",
+      "errorCodes": [
+        "unauthorized",
+        "not-found"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "pluginMarket.releaseDownload",
+      "owner": "plugin-market",
+      "capability": "canUsePluginMarket",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/plugins/:pluginId/releases/:releaseId/download",
+      "callsites": [
+        "apps/desktop/src/main/plugin-market/api.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "release 包体二进制流",
+      "errorCodes": [
+        "unauthorized",
+        "not-found"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "notes": "path 都带用户安装的插件 ID(api.ts 顶注);服务端必须校验 ACL。"
+    },
+    {
+      "id": "pluginPublisher.uploadCreate",
+      "owner": "plugin-publisher",
+      "capability": "canPublishPlugins",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/publisher/uploads",
+      "callsites": [
+        "apps/desktop/src/main/plugin-publisher/api.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": "upload 元数据",
+      "responseSchema": "raw → 上层解析(unknown)",
+      "errorCodes": [
+        "unauthorized",
+        "forbidden"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "no(新 upload)",
+      "sideEffects": "创建 upload transaction",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "pluginPublisher.uploadCommit",
+      "owner": "plugin-publisher",
+      "capability": "canPublishPlugins",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/publisher/uploads/:uploadId/commit",
+      "callsites": [
+        "apps/desktop/src/main/plugin-publisher/api.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": "commit 负载",
+      "responseSchema": "raw → 上层解析(unknown)",
+      "errorCodes": [
+        "unauthorized",
+        "upload-incomplete"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "no",
+      "sideEffects": "提交发布",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "pluginPublisher.uploadStatus",
+      "owner": "plugin-publisher",
+      "capability": "canPublishPlugins",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/publisher/uploads/:uploadId",
+      "callsites": [
+        "apps/desktop/src/main/plugin-publisher/api.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "raw → 上层解析(unknown)",
+      "errorCodes": [
+        "unauthorized",
+        "not-found"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "pluginPublisher.myReleases",
+      "owner": "plugin-publisher",
+      "capability": "canPublishPlugins",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/publisher/releases/mine",
+      "callsites": [
+        "apps/desktop/src/main/plugin-publisher/api.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": "query suffix",
+      "responseSchema": "raw → 上层解析(unknown)",
+      "errorCodes": [
+        "unauthorized"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "desktopUpdate.manifest",
+      "owner": "desktop-update",
+      "capability": "canCheckDesktopUpdates",
+      "transport": "http",
+      "method": "GET",
+      "path": "{cdnBaseUrl}/manifest-:platform.json",
+      "callsites": [
+        "apps/desktop/src/main/manifestService.ts"
+      ],
+      "auth": "none(公开 CDN)",
+      "requestSchema": "query: t=<cache buster>",
+      "responseSchema": "更新 manifest(版本比较逻辑消费)",
+      "errorCodes": [
+        "404(beta 未部署)→ 回退默认通道",
+        "network"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "sourceLiteral": "manifest-",
+      "pathValidation": "source-literal",
+      "notes": "platform 后缀与 channel 后缀(-canary/-beta)由构建与用户通道决定;cdnBaseUrl 为空时 updater 不初始化(蓝图 §2.5)。"
+    },
+    {
+      "id": "desktopUpdate.artifact",
+      "owner": "desktop-update",
+      "capability": "canCheckDesktopUpdates",
+      "transport": "http",
+      "method": "GET",
+      "path": "{cdnBaseUrl}/:artifactFile",
+      "callsites": [
+        "apps/desktop/src/main/updateService.ts"
+      ],
+      "auth": "none(公开 CDN)",
+      "requestSchema": null,
+      "responseSchema": "更新包二进制(下载后校验)",
+      "errorCodes": [
+        "network",
+        "checksum"
+      ],
+      "timeoutMs": null,
+      "retry": "下载器重试",
+      "idempotency": "yes",
+      "sideEffects": "下载更新包",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "pathValidation": "none"
+    },
+    {
+      "id": "mobileUpdate.latest",
+      "owner": "mobile-update",
+      "capability": "canCheckMobileUpdates",
+      "transport": "http",
+      "method": "GET",
+      "path": "{mobileUpdateBaseUrl}/latest",
+      "callsites": [
+        "apps/mobile/src/update/fetchLatestRelease.ts#fetchLatestRelease",
+        "apps/mobile/src/update/useStartupOtaGate.ts",
+        "apps/mobile/src/config/env.ts#OTA_SERVER_BASE_URL"
+      ],
+      "auth": "none",
+      "requestSchema": "query: platform, channel",
+      "responseSchema": "整包发现响应(runtimeVersion 不同则引导安装)",
+      "errorCodes": [
+        "network"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "sourceLiteral": "/latest",
+      "pathValidation": "source-literal",
+      "notes": "mobileUpdateBaseUrl 为空时 OTA gate 必须 ready 且关闭检查(蓝图 §3.5);Expo OTA 原生通道独立于本 route。"
+    },
+    {
+      "id": "logUpload.track",
+      "owner": "log-upload",
+      "capability": "canUploadLogs",
+      "transport": "http",
+      "method": "POST",
+      "path": "https://:project.:endpointHost/logstores/:logstore/track",
+      "callsites": [
+        "apps/desktop/src/main/log-upload/logSink.ts#buildTrackUrl"
+      ],
+      "auth": "none(SLS 免签 + endpointHost 钉死校验)",
+      "requestSchema": "日志批次(已脱敏)",
+      "responseSchema": "HTTP status",
+      "errorCodes": [
+        "network",
+        "4xx/5xx"
+      ],
+      "timeoutMs": null,
+      "retry": "待补传标记 + 标记代次机制",
+      "idempotency": "yes",
+      "sideEffects": "写入第三方日志服务",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "sourceLiteral": "/logstores/",
+      "pathValidation": "source-literal",
+      "notes": "endpointHost 由构建注入;不在 endpoint manifest。self-host 发行版默认不配置即不采集不上传。"
+    },
+    {
+      "id": "telemetry.tapdb",
+      "owner": "telemetry",
+      "capability": "canSendTelemetry",
+      "transport": "http",
+      "method": "POST",
+      "path": "https://e.tapdb.com(/e.tapdb.ap-sg.tapapis.com)",
+      "callsites": [
+        "apps/desktop/src/renderer/analytics/tapdbClient.ts"
+      ],
+      "auth": "none(TapDB projectId 区分 cn/sg)",
+      "requestSchema": "TapDB 事件 payload(第三方 SDK 协议)",
+      "responseSchema": "忽略",
+      "errorCodes": [
+        "静默"
+      ],
+      "timeoutMs": null,
+      "retry": "SDK 内部",
+      "idempotency": "yes",
+      "sideEffects": "第三方埋点采集",
+      "confidence": "C",
+      "protocolVersion": null,
+      "tests": [],
+      "pathValidation": "none",
+      "notes": "官方发行版专属;self-host 发行版 telemetryPolicy=disabled 时必须整体不初始化。"
+    },
+    {
+      "id": "auth.connections.token",
+      "owner": "auth",
+      "capability": "canUseAccount",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/auth/connections/token",
+      "callsites": [
+        "apps/desktop/src/main/cindy-brain/index.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": "连接目标标识",
+      "responseSchema": "IssuedConnectionToken(typed)",
+      "errorCodes": [
+        "unauthorized",
+        "forbidden"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "no",
+      "sideEffects": "签发一次性连接 token",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "notes": "cindy-brain 连接链路取 token。"
+    },
+    {
+      "id": "modelAccess.balance",
+      "owner": "model-access",
+      "capability": "canUseManagedModels",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/model-access/balance",
+      "callsites": [
+        "apps/desktop/src/main/billing/index.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "unknown → projectModelAccessBalance 投影(严格 keys 校验)",
+      "errorCodes": [
+        "unauthorized",
+        "redactErrorDetails"
+      ],
+      "timeoutMs": "BILLING_REQUEST_TIMEOUT_MS",
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "notes": "余额查询;错误详情脱敏(redactErrorDetails)。"
+    },
+    {
+      "id": "modelAccess.creditUsage",
+      "owner": "model-access",
+      "capability": "canUseManagedModels",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/model-access/credit-usage",
+      "callsites": [
+        "apps/desktop/src/main/billing/index.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "unknown → projectModelAccessCreditUsage 投影",
+      "errorCodes": [
+        "unauthorized"
+      ],
+      "timeoutMs": "BILLING_REQUEST_TIMEOUT_MS",
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "modelAccess.invocationGuide",
+      "owner": "model-access",
+      "capability": "canUseManagedModels",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/model-access/invocation-guide",
+      "callsites": [
+        "apps/desktop/src/shared/mediaInvocation.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": "media invocation 描述",
+      "responseSchema": "invocation guide(typed)",
+      "errorCodes": [
+        "unauthorized",
+        "unsupported"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only 语义",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "modelAccess.invocationGuides",
+      "owner": "model-access",
+      "capability": "canUseManagedModels",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/model-access/invocation-guides",
+      "callsites": [
+        "apps/desktop/src/shared/mediaInvocation.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": "批量 media invocation 描述",
+      "responseSchema": "invocation guides(typed)",
+      "errorCodes": [
+        "unauthorized",
+        "unsupported"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only 语义",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "modelAccess.modelCatalog",
+      "owner": "model-access",
+      "capability": "canUseManagedModels",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/model-catalog/catalog",
+      "callsites": [
+        "packages/model-providers/src/source.ts#CATALOG_API_PATH"
+      ],
+      "auth": "none(model-access-server 匿名提供)",
+      "requestSchema": null,
+      "responseSchema": "Catalog(parseCatalog 严格解析;失败回退 OSS /cfg/providers.json)",
+      "errorCodes": [
+        "network",
+        "parse-error"
+      ],
+      "timeoutMs": "DEFAULT_REMOTE_CATALOG_BUDGET_MS(15s 预算)",
+      "retry": "fallback 链:公共 API → OSS 相对路径 → bundled",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "A",
+      "protocolVersion": "catalog revision 比较",
+      "tests": [],
+      "notes": "公共模型目录;baseUrl 不在 endpoint manifest(由 model-access 下发/构建默认)。"
+    },
+    {
+      "id": "skillhub.skills.download",
+      "owner": "skillhub",
+      "capability": "canUseSkillHubCloud",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/skills-hub/skills/:slug/download",
+      "callsites": [
+        "apps/desktop/src/main/skillhub/installService.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": "query: version?(versionQs)",
+      "responseSchema": "skill 包二进制流",
+      "errorCodes": [
+        "unauthorized",
+        "not-found"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": []
+    },
+    {
+      "id": "billing.catalog",
+      "owner": "billing",
+      "capability": "canUseManagedModels",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/billing/catalog",
+      "callsites": [
+        "apps/desktop/src/main/billing/index.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "unknown → projectBillingCatalog 投影",
+      "errorCodes": [
+        "unauthorized",
+        "invalid-params",
+        "payment-state"
+      ],
+      "timeoutMs": "BILLING_REQUEST_TIMEOUT_MS",
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "notes": null
+    },
+    {
+      "id": "billing.orders.list",
+      "owner": "billing",
+      "capability": "canUseManagedModels",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/billing/orders",
+      "callsites": [
+        "apps/desktop/src/main/billing/index.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": "query: limit(1..100 整数)",
+      "responseSchema": "unknown → projectBillingOrderList 投影",
+      "errorCodes": [
+        "unauthorized",
+        "invalid-params",
+        "payment-state"
+      ],
+      "timeoutMs": "BILLING_REQUEST_TIMEOUT_MS",
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "notes": null
+    },
+    {
+      "id": "billing.orders.get",
+      "owner": "billing",
+      "capability": "canUseManagedModels",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/billing/orders/:orderId",
+      "callsites": [
+        "apps/desktop/src/main/billing/index.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "unknown → projectBillingPaymentOrder 投影",
+      "errorCodes": [
+        "unauthorized",
+        "invalid-params",
+        "payment-state"
+      ],
+      "timeoutMs": "BILLING_REQUEST_TIMEOUT_MS",
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "notes": null
+    },
+    {
+      "id": "billing.orders.refresh",
+      "owner": "billing",
+      "capability": "canUseManagedModels",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/billing/orders/:orderId/refresh",
+      "callsites": [
+        "apps/desktop/src/main/billing/index.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "unknown → projectBillingPaymentOrder 投影",
+      "errorCodes": [
+        "unauthorized",
+        "invalid-params",
+        "payment-state"
+      ],
+      "timeoutMs": "BILLING_REQUEST_TIMEOUT_MS",
+      "retry": "由调用方决定",
+      "idempotency": "yes",
+      "sideEffects": "刷新支付单状态",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "notes": null
+    },
+    {
+      "id": "billing.orders.cancel",
+      "owner": "billing",
+      "capability": "canUseManagedModels",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/billing/orders/:orderId/cancel",
+      "callsites": [
+        "apps/desktop/src/main/billing/index.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "unknown → projectBillingPaymentOrder 投影",
+      "errorCodes": [
+        "unauthorized",
+        "invalid-params",
+        "payment-state"
+      ],
+      "timeoutMs": "BILLING_REQUEST_TIMEOUT_MS",
+      "retry": "由调用方决定",
+      "idempotency": "yes",
+      "sideEffects": "取消支付单",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "notes": null
+    },
+    {
+      "id": "billing.orders.retry",
+      "owner": "billing",
+      "capability": "canUseManagedModels",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/billing/orders/:orderId/retry",
+      "callsites": [
+        "apps/desktop/src/main/billing/index.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "unknown → projectBillingPaymentOrder 投影",
+      "errorCodes": [
+        "unauthorized",
+        "invalid-params",
+        "payment-state"
+      ],
+      "timeoutMs": "BILLING_REQUEST_TIMEOUT_MS",
+      "retry": "由调用方决定",
+      "idempotency": "yes(Idempotency-Key)",
+      "sideEffects": "重试支付",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "notes": null
+    },
+    {
+      "id": "billing.creditTopup.create",
+      "owner": "billing",
+      "capability": "canUseManagedModels",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/billing/credit-topup/orders",
+      "callsites": [
+        "apps/desktop/src/main/billing/index.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": "topup request",
+      "responseSchema": "unknown → projectBillingPaymentOrder 投影",
+      "errorCodes": [
+        "unauthorized",
+        "invalid-params",
+        "payment-state"
+      ],
+      "timeoutMs": "BILLING_REQUEST_TIMEOUT_MS",
+      "retry": "由调用方决定",
+      "idempotency": "no(客户端生成 Idempotency-Key)",
+      "sideEffects": "创建充值单",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "notes": "携带 Idempotency-Key 头,服务端必须幂等。"
+    },
+    {
+      "id": "billing.subscriptions.create",
+      "owner": "billing",
+      "capability": "canUseManagedModels",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/billing/subscriptions",
+      "callsites": [
+        "apps/desktop/src/main/billing/index.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": "subscription request",
+      "responseSchema": "unknown → projectBillingSubscription 投影",
+      "errorCodes": [
+        "unauthorized",
+        "invalid-params",
+        "payment-state"
+      ],
+      "timeoutMs": "BILLING_REQUEST_TIMEOUT_MS",
+      "retry": "由调用方决定",
+      "idempotency": "no(客户端生成 Idempotency-Key)",
+      "sideEffects": "创建订阅",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "notes": "携带 Idempotency-Key 头。"
+    },
+    {
+      "id": "billing.subscription.get",
+      "owner": "billing",
+      "capability": "canUseManagedModels",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/billing/subscription",
+      "callsites": [
+        "apps/desktop/src/main/billing/index.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "unknown → projectBillingCurrentSubscription 投影",
+      "errorCodes": [
+        "unauthorized",
+        "invalid-params",
+        "payment-state"
+      ],
+      "timeoutMs": "BILLING_REQUEST_TIMEOUT_MS",
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "notes": null
+    },
+    {
+      "id": "billing.subscription.cancel",
+      "owner": "billing",
+      "capability": "canUseManagedModels",
+      "transport": "http",
+      "method": "DELETE",
+      "path": "/api/billing/subscription",
+      "callsites": [
+        "apps/desktop/src/main/billing/index.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "unknown → projectBillingCurrentSubscription 投影",
+      "errorCodes": [
+        "unauthorized",
+        "invalid-params",
+        "payment-state"
+      ],
+      "timeoutMs": "BILLING_REQUEST_TIMEOUT_MS",
+      "retry": "由调用方决定",
+      "idempotency": "yes",
+      "sideEffects": "取消当前订阅",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "notes": null
+    },
+    {
+      "id": "billing.subscription.resume",
+      "owner": "billing",
+      "capability": "canUseManagedModels",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/billing/subscription/resume",
+      "callsites": [
+        "apps/desktop/src/main/billing/index.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "unknown → projectBillingCurrentSubscription 投影",
+      "errorCodes": [
+        "unauthorized",
+        "invalid-params",
+        "payment-state"
+      ],
+      "timeoutMs": "BILLING_REQUEST_TIMEOUT_MS",
+      "retry": "由调用方决定",
+      "idempotency": "yes",
+      "sideEffects": "恢复订阅",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "notes": null
+    },
+    {
+      "id": "billing.subscription.portal",
+      "owner": "billing",
+      "capability": "canUseManagedModels",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/billing/subscription/portal",
+      "callsites": [
+        "apps/desktop/src/main/billing/index.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "unknown(托管门户跳转参数)",
+      "errorCodes": [
+        "unauthorized",
+        "invalid-params",
+        "payment-state"
+      ],
+      "timeoutMs": "BILLING_REQUEST_TIMEOUT_MS",
+      "retry": "由调用方决定",
+      "idempotency": "no",
+      "sideEffects": "创建 portal 会话",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "notes": null
+    },
+    {
+      "id": "billing.subscription.planChangeQuote",
+      "owner": "billing",
+      "capability": "canUseManagedModels",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/billing/subscription/plan-change-quotes",
+      "callsites": [
+        "apps/desktop/src/main/billing/index.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": "plan change request",
+      "responseSchema": "unknown → 投影",
+      "errorCodes": [
+        "unauthorized",
+        "invalid-params",
+        "payment-state"
+      ],
+      "timeoutMs": "BILLING_REQUEST_TIMEOUT_MS",
+      "retry": "由调用方决定",
+      "idempotency": "no",
+      "sideEffects": "生成变更报价",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "notes": null
+    },
+    {
+      "id": "billing.subscription.planChange.get",
+      "owner": "billing",
+      "capability": "canUseManagedModels",
+      "transport": "http",
+      "method": "GET",
+      "path": "/api/billing/subscription/plan-changes/:planChangeId",
+      "callsites": [
+        "apps/desktop/src/main/billing/index.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "unknown → 投影",
+      "errorCodes": [
+        "unauthorized",
+        "invalid-params",
+        "payment-state"
+      ],
+      "timeoutMs": "BILLING_REQUEST_TIMEOUT_MS",
+      "retry": "由调用方决定",
+      "idempotency": "read-only",
+      "sideEffects": "none",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "notes": null
+    },
+    {
+      "id": "billing.subscription.planChange.confirm",
+      "owner": "billing",
+      "capability": "canUseManagedModels",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/billing/subscription/plan-changes/:planChangeId/confirm",
+      "callsites": [
+        "apps/desktop/src/main/billing/index.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "unknown → 投影",
+      "errorCodes": [
+        "unauthorized",
+        "invalid-params",
+        "payment-state"
+      ],
+      "timeoutMs": "BILLING_REQUEST_TIMEOUT_MS",
+      "retry": "由调用方决定",
+      "idempotency": "no",
+      "sideEffects": "确认变更",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "notes": null
+    },
+    {
+      "id": "billing.subscription.planChange.refresh",
+      "owner": "billing",
+      "capability": "canUseManagedModels",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/billing/subscription/plan-changes/:planChangeId/refresh",
+      "callsites": [
+        "apps/desktop/src/main/billing/index.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "unknown → 投影",
+      "errorCodes": [
+        "unauthorized",
+        "invalid-params",
+        "payment-state"
+      ],
+      "timeoutMs": "BILLING_REQUEST_TIMEOUT_MS",
+      "retry": "由调用方决定",
+      "idempotency": "yes",
+      "sideEffects": "刷新变更状态",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "notes": null
+    },
+    {
+      "id": "billing.subscription.planChange.cancel",
+      "owner": "billing",
+      "capability": "canUseManagedModels",
+      "transport": "http",
+      "method": "DELETE",
+      "path": "/api/billing/subscription/plan-changes/:planChangeId",
+      "callsites": [
+        "apps/desktop/src/main/billing/index.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "unknown → 投影",
+      "errorCodes": [
+        "unauthorized",
+        "invalid-params",
+        "payment-state"
+      ],
+      "timeoutMs": "BILLING_REQUEST_TIMEOUT_MS",
+      "retry": "由调用方决定",
+      "idempotency": "yes",
+      "sideEffects": "取消变更",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "notes": null
+    },
+    {
+      "id": "billing.subscriptions.purchaseRefresh",
+      "owner": "billing",
+      "capability": "canUseManagedModels",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/billing/subscriptions/purchases/:purchaseAttemptId/refresh",
+      "callsites": [
+        "apps/desktop/src/main/billing/index.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": null,
+      "responseSchema": "unknown → 投影",
+      "errorCodes": [
+        "unauthorized",
+        "invalid-params",
+        "payment-state"
+      ],
+      "timeoutMs": "BILLING_REQUEST_TIMEOUT_MS",
+      "retry": "由调用方决定",
+      "idempotency": "yes",
+      "sideEffects": "刷新商店购买尝试状态",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "notes": null
+    },
+    {
+      "id": "oauthBroker.integrationOAuth",
+      "owner": "oauth-broker",
+      "capability": "canUseOAuthBroker",
+      "transport": "http",
+      "method": "POST",
+      "path": "/api/integrations/:slug/oauth/:action",
+      "callsites": [
+        "apps/desktop/src/main/cindy-brain/ghostOauthBroker.ts",
+        "apps/desktop/src/main/cindy-brain/ghostOauthFlow.ts"
+      ],
+      "auth": "bearer",
+      "requestSchema": "第三方 OAuth 授权码交换/刷新(:action ∈ exchange|refresh)",
+      "responseSchema": "token bundle(typed)",
+      "errorCodes": [
+        "unauthorized",
+        "invalid-grant",
+        "integration-disabled"
+      ],
+      "timeoutMs": null,
+      "retry": "由调用方决定",
+      "idempotency": "no(授权码一次性)",
+      "sideEffects": "server 侧保存/轮换加密 grant",
+      "confidence": "B",
+      "protocolVersion": null,
+      "tests": [],
+      "notes": "action 段在源码为插值;client secret 由服务端持有,不随包分发。"
+    }
+  ],
+  "websocketChannels": [
+    {
+      "id": "hooks.telegram",
+      "owner": "hooks",
+      "capability": "canUseHostedTelegramHook",
+      "url": "{telegramHookWsUrl}",
+      "callsites": [
+        "apps/desktop/src/main/hook-control/ipc.ts"
+      ],
+      "notes": "URL 整体来自 manifest 字段(无 path 拼接);telegramHookWsUrl 为空时仅隐藏托管 Telegram hook,保留个人/本地 bot。"
+    },
+    {
+      "id": "hooks.x",
+      "owner": "hooks",
+      "capability": "canUseHostedXHook",
+      "url": "{xHookWsUrl}",
+      "callsites": [
+        "apps/desktop/src/main/hook-control/ipc.ts"
+      ],
+      "notes": "xHookWsUrl 为空时 Settings 卡片隐藏(渐进发布开关)。"
+    },
+    {
+      "id": "hooks.slack",
+      "owner": "hooks",
+      "capability": "canUseHostedSlackHook",
+      "url": "{slackHookWsUrl}",
+      "callsites": [
+        "apps/desktop/src/main/hook-control/ipc.ts",
+        "apps/desktop/src/main/hook-control/store.ts"
+      ],
+      "notes": "urlOverride 是无 UI 的隐藏覆写位,默认取 manifest slackHookWsUrl。"
+    }
+  ],
+  "directProviderEgress": {
+    "description": "BYOK / 本地模型场景下,客户端按用户配置的 provider endpoint 直连(OpenAI/Anthropic 兼容协议等)。这些 endpoint 由用户控制,不逐 route 登记;已知 provider 域名统一登记在 external-domain-inventory.json 的 model-provider 类别,其固定路径(Anthropic OAuth usage/profile、火山引擎视频生成等)在 registryCoverage.pathPrefixExemptions 登记。self-host 无 egress 目标下这是唯一允许的运行时外部流量类别(用户显式配置)。",
+    "packages": [
+      "packages/model-providers",
+      "packages/anthropic-compat-proxy",
+      "packages/embedding-client",
+      "packages/anthropic-responses-bridge",
+      "packages/responses-anthropic-bridge",
+      "packages/responses-chat-bridge"
+    ],
+    "embeddingClientNote": "embedding-client 的 endpoint 来自受控配置(check-endpoint-literals.mjs CONTROLLED_SOURCE_FILES),支持自定义 fetchImpl,不烘焙官方域名。"
+  },
+  "registryCoverage": {
+    "description": "本 registry 覆盖的扫描范围(与 check 脚本一致)。范围内源码字符串字面量中的 '/api/...' 路径必须能匹配上述 route 或命中豁免;新增调用未登记时 CI 失败。pathExemptions 为精确匹配,pathPrefixExemptions 按段边界前缀匹配。",
+    "scanRoots": [
+      "apps/desktop/src",
+      "apps/desktop/bootstrap-electron.ts",
+      "apps/mobile/src",
+      "packages"
+    ],
+    "scanExcludes": [
+      "**/__tests__/**",
+      "**/*.test.*",
+      "**/*.spec.*",
+      "**/fixtures/**",
+      "**/*.generated.*",
+      "**/dist/**",
+      "**/node_modules/**",
+      "packages/gitlab-client",
+      "packages/lizi-mcps",
+      "packages/model-providers/catalog",
+      "apps/desktop/src/renderer/vendor"
+    ],
+    "knownGaps": [
+      "C 级条目(telemetry.tapdb)需在 Phase 0 收尾前补 characterization test 或明确移除。",
+      "desktop update manifest 的 beta/canary 后缀变体合并登记为一条;server 实现需同时支持无后缀/-canary/-beta。",
+      "OAuth social provider 枚举(apple|google|wechat)由 auth-client 类型约束;新增 provider 必须同步本 registry。",
+      "billing / model-access balance 面目前仅 B 级(投影函数消费);server 重建时先补 characterization fixture 再实现。"
+    ],
+    "pathExemptions": [
+      {
+        "path": "/api/skills-hub",
+        "reason": "hubApi.ts logLabel 字面量(日志标签,非调用)"
+      },
+      {
+        "path": "/api/publisher",
+        "reason": "plugin-publisher/api.ts logLabel 字面量(日志标签,非调用)"
+      },
+      {
+        "path": "/api/delete",
+        "reason": "Ollama 本地 API(本地模型 provider,127.0.0.1)"
+      },
+      {
+        "path": "/api/show",
+        "reason": "Ollama 本地 API(本地模型 provider)"
+      },
+      {
+        "path": "/api/pull",
+        "reason": "Ollama 本地 API(本地模型 provider)"
+      },
+      {
+        "path": "/api/tags",
+        "reason": "Ollama 本地 API(本地模型 provider)"
+      },
+      {
+        "path": "/api/version",
+        "reason": "Ollama 本地 API(本地模型 provider)"
+      },
+      {
+        "path": "/api/s2s",
+        "reason": "marketErrors.ts 错误分类字符串匹配(非网络调用)"
+      }
+    ],
+    "pathPrefixExemptions": [
+      {
+        "path": "/api/oauth",
+        "reason": "Anthropic OAuth 直连(api.anthropic.com /api/oauth/usage|profile,Claude 订阅;域在 external-domain-inventory model-provider)",
+        "domains": [
+          "api.anthropic.com"
+        ]
+      },
+      {
+        "path": "/api/v3/sauc",
+        "reason": "内置免费 ASR 第三方直连(voiceInputAsrProfiles.ts)",
+        "domains": [
+          "第三方 ASR host"
+        ]
+      },
+      {
+        "path": "/api/v1/services",
+        "reason": "火山引擎视频生成直连(第三方 provider)",
+        "domains": [
+          "ark.cn-beijing.volces.com"
+        ]
+      },
+      {
+        "path": "/api/v3/contents",
+        "reason": "火山引擎视频生成直连(第三方 provider)",
+        "domains": [
+          "ark.cn-beijing.volces.com"
+        ]
+      }
+    ]
+  }
+}
