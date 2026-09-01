@@ -22,8 +22,21 @@ export default defineConfig(({ mode }) => {
   // explicit .env/process override still wins, while API/Auth keep their
   // localhost defaults below.
   const configuredClientEnv = desktopClientBuildEnv({ allowEnvOverride: false });
-  const readViteEnv = (key: keyof typeof configuredClientEnv): string =>
-    env[key] || process.env[key] || configuredClientEnv[key];
+  // 独立发行:官方清单自举基址必须清空(desktopClientBuildEnv 从 config/endpoint*.json
+  // 读出的官方 CDN base 不得进入 self-host 包——蓝图 B6/工作流 D);真实自举来源由
+  // VITE_CINDY_DISTRIBUTION_MANIFEST_SOURCE(embedded 烘焙 / remote bootstrapUrl)承载。
+  const stripOfficialManifestBootstrap =
+    (env.CINDY_DISTRIBUTION_PROFILE || process.env.CINDY_DISTRIBUTION_PROFILE) ? true : false;
+  const readViteEnv = (key: keyof typeof configuredClientEnv): string => {
+    const value = env[key] || process.env[key] || configuredClientEnv[key];
+    if (
+      stripOfficialManifestBootstrap
+      && (key === 'VITE_ENDPOINT_MANIFEST_BASE_URL' || key === 'VITE_ENDPOINT_MANIFEST_PEER_BASE_URL')
+    ) {
+      return '';
+    }
+    return value;
+  };
   // 非 VITE_* 的 main-only 变量（不暴露到 renderer/preload；编译期注入）
   const allEnv = loadEnv(mode, process.cwd(), '');
   const readMainEnv = (key: string): string => allEnv[key] || process.env[key] || '';
@@ -52,6 +65,14 @@ export default defineConfig(({ mode }) => {
       ),
       'import.meta.env.VITE_CINDY_DISTRIBUTION_IDENTITY': JSON.stringify(
         env.VITE_CINDY_DISTRIBUTION_IDENTITY || process.env.VITE_CINDY_DISTRIBUTION_IDENTITY || '',
+      ),
+      // endpoint manifest 自举来源(main-only):独立发行注入 { mode, embeddedManifest?,
+      // bootstrapUrl?, trustedEndpointDomains };官方为空串(走既有自举链)。消费单点:
+      // src/shared/brandRegion.ts → CURRENT_DISTRIBUTION_MANIFEST_SOURCE。
+      'import.meta.env.VITE_CINDY_DISTRIBUTION_MANIFEST_SOURCE': JSON.stringify(
+        env.VITE_CINDY_DISTRIBUTION_MANIFEST_SOURCE
+          || process.env.VITE_CINDY_DISTRIBUTION_MANIFEST_SOURCE
+          || '',
       ),
       // 本区与对端的两份端点清单自举基址(业务端点已全部改走运行期清单,
       // 旧的 VITE_API_BASE_URL 等端点 define 随之退役)。dev 构建也注入 cn 值,

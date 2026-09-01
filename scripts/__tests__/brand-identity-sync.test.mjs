@@ -162,11 +162,17 @@ test('distribution profile 构建期 env 名在 forge 与 vite 两处一致', ()
   const viteSource = readSource('apps/desktop/vite.main.config.ts');
   const runtimeSource = readSource('apps/desktop/src/shared/brandRegion.ts');
   const mainEntrySource = readSource('apps/desktop/src/main/index.ts');
-  for (const env of ['VITE_CINDY_DISTRIBUTION_ID', 'VITE_CINDY_DISTRIBUTION_IDENTITY']) {
+  for (const env of ['VITE_CINDY_DISTRIBUTION_ID', 'VITE_CINDY_DISTRIBUTION_IDENTITY', 'VITE_CINDY_DISTRIBUTION_MANIFEST_SOURCE']) {
     assert.ok(viteSource.includes(env), `vite.main.config 缺少发行身份 define: ${env}`);
-    assert.ok(runtimeSource.includes(env), `brandRegion.ts 未消费发行身份 define: ${env}`);
     assert.ok(forgeSource.includes(`process.env.${env}`), `forge.config 未回写发行身份 env: ${env}`);
   }
+  // 运行时消费单点:brandRegion(身份 + manifest 来源)与 clientEndpointsService
+  // (embedded/remote 自举分支)必须消费注入的发行身份。
+  assert.ok(runtimeSource.includes('VITE_CINDY_DISTRIBUTION_IDENTITY'), 'brandRegion.ts 未消费发行 identity define');
+  assert.ok(
+    readSource('apps/desktop/src/main/clientEndpointsService.ts').includes('CURRENT_DISTRIBUTION_MANIFEST_SOURCE'),
+    'clientEndpointsService 未消费发行 manifest 来源(embedded/remote 自举未接入)',
+  );
   // 构建期 profile 选取 env:forge 是唯一 resolve 入口(单一事实源),vite 只透传。
   assert.ok(forgeSource.includes('CINDY_DISTRIBUTION_PROFILE'), 'forge.config 未消费构建期 profile env');
   assert.ok(

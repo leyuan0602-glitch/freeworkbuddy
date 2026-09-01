@@ -209,6 +209,16 @@ describe('resolveEndpointSource(清单来源三选一)', () => {
   const DEFAULT_FILE = path.join(REPO_ROOT, 'config', 'endpoint.json');
 
   it.each([
+    ['独立发行 embedded 优先于一切(不做网络自举)', {
+      isPackaged: true,
+      manifestSource: { mode: 'embedded', embeddedManifest: { schemaVersion: 1 }, trustedEndpointDomains: ['freeworkbuddy.me'] },
+      env: { XDT_ENDPOINTS_CDN: '1', XDT_ENDPOINT_MANIFEST_FILE: '/x/y.json' },
+    }, { kind: 'embedded' }],
+    ['独立发行 remote 走 CDN 分支(自举 URL 由调用方注入)', {
+      isPackaged: true,
+      manifestSource: { mode: 'remote', bootstrapUrl: 'https://api.freeworkbuddy.me', trustedEndpointDomains: ['freeworkbuddy.me'] },
+      env: {},
+    }, { kind: 'cdn' }],
     ['packaged 恒 CDN', { isPackaged: true, env: {} }, { kind: 'cdn' }],
     [
       'packaged 下 dev 覆写全部忽略',

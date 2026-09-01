@@ -58,6 +58,19 @@ process.env.VITE_CINDY_DISTRIBUTION_ID = DISTRIBUTION_PROFILE.distributionId;
 process.env.VITE_CINDY_DISTRIBUTION_IDENTITY = DISTRIBUTION_PROFILE.region
   ? ''
   : JSON.stringify(resolveBrandIdentityFromProfile(DISTRIBUTION_PROFILE));
+// endpoint manifest 自举来源(工作流 D):独立发行把 profile 的 manifest 模式 +
+// 信任根 + (remote 时)自举 URL 烘焙给运行时;官方发行留空(信任根/自举基址走
+// 既有 REGION_ENDPOINT_DOMAIN / VITE_ENDPOINT_MANIFEST_BASE_URL 链路)。
+// embedded = Local-first:清单全空端点烘焙进产物,不做网络自举(蓝图 §3.5)。
+process.env.VITE_CINDY_DISTRIBUTION_MANIFEST_SOURCE = DISTRIBUTION_PROFILE.region
+  ? ''
+  : JSON.stringify({
+      mode: DISTRIBUTION_PROFILE.endpointManifest.mode,
+      ...(DISTRIBUTION_PROFILE.endpointManifest.mode === 'embedded'
+        ? { embeddedManifest: { schemaVersion: 1 } }
+        : { bootstrapUrl: DISTRIBUTION_PROFILE.endpointManifest.bootstrapUrl ?? '' }),
+      trustedEndpointDomains: [...DISTRIBUTION_PROFILE.endpointManifest.trustedEndpointDomains],
+    });
 // 本构建的系统身份(官方路径 = BRAND_IDENTITY 原样,区域差异保留;独立发行 =
 // by-region 三键同值的派生 identity)。forge 侧与运行时消费全部经它取值。
 const BUILD_IDENTITY: BrandIdentity = DISTRIBUTION_PROFILE.region

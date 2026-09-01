@@ -64,5 +64,46 @@ export const CURRENT_BRAND_IDENTITY: BrandIdentity = (() => {
   return injected ? parseInjectedIdentity(injected) : BRAND_IDENTITY;
 })();
 
+/**
+ * endpoint manifest 自举来源(独立发行注入;官方 null)。
+ * embedded = Local-first:清单全空端点烘焙进产物,不做网络自举;
+ * remote = 联网部署:bootstrapUrl 是唯一自举源,信任根来自 profile(不放远端清单)。
+ */
+export interface DistributionManifestSource {
+  mode: 'embedded' | 'remote';
+  /** mode='embedded' 时必带(全空端点的清单原文 schema)。 */
+  embeddedManifest?: { schemaVersion: number };
+  /** mode='remote' 时必带(构建期固定的自举 URL,https)。 */
+  bootstrapUrl?: string;
+  /** 离线缓存可信域(信任根,来自 profile,不得来自远端清单)。 */
+  trustedEndpointDomains: readonly string[];
+}
+
+function parseInjectedManifestSource(raw: string): DistributionManifestSource {
+  const parsed = JSON.parse(raw) as DistributionManifestSource;
+  if (
+    (parsed?.mode !== 'embedded' && parsed?.mode !== 'remote')
+    || !Array.isArray(parsed?.trustedEndpointDomains)
+    || parsed.trustedEndpointDomains.length === 0
+  ) {
+    throw new Error('VITE_CINDY_DISTRIBUTION_MANIFEST_SOURCE: 注入的自举来源结构非法');
+  }
+  if (parsed.mode === 'embedded' && !parsed.embeddedManifest) {
+    throw new Error('VITE_CINDY_DISTRIBUTION_MANIFEST_SOURCE: embedded 模式缺少 embeddedManifest');
+  }
+  if (parsed.mode === 'remote' && !parsed.bootstrapUrl) {
+    throw new Error('VITE_CINDY_DISTRIBUTION_MANIFEST_SOURCE: remote 模式缺少 bootstrapUrl');
+  }
+  return parsed;
+}
+
+/**
+ * 本构建的 endpoint manifest 自举来源;官方构建为 null(走既有自举链)。
+ */
+export const CURRENT_DISTRIBUTION_MANIFEST_SOURCE: DistributionManifestSource | null = (() => {
+  const injected = import.meta.env?.VITE_CINDY_DISTRIBUTION_MANIFEST_SOURCE;
+  return injected ? parseInjectedManifestSource(injected) : null;
+})();
+
 /** 本构建的系统身份 id(Windows AUMID / macOS bundle id)。 */
 export const CURRENT_APP_ID: string = CURRENT_BRAND_IDENTITY.appIdByRegion[CURRENT_CINDY_REGION];
