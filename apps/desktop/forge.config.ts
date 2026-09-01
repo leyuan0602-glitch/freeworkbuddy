@@ -12,13 +12,14 @@ import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import type { ForgeArch, ForgeConfig, ForgePlatform } from '@electron-forge/shared-types';
 import {
-  BRAND_IDENTITY,
   allDeepLinkSchemes,
-  brandAppId,
-  brandBundleIdPrefix,
-  brandExecutableName,
   resolveCindyRegion,
+  type BrandIdentity,
 } from '@cindy/maker-shared/brand-identity';
+import {
+  resolveBrandIdentityFromProfile,
+  resolveDistributionProfile,
+} from '@cindy/maker-shared/distribution-profile';
 import { stageMacIOSSimulatorHelper } from './forge-ios-simulator-helper';
 import { stagePackagedThirdPartyNotices } from './forge-third-party-notices';
 import { READ_SHEET_RUNTIME_PACKAGES } from '../../packages/lizi-mcps/src/cindy-docs/readSheetRuntimeDeps';
@@ -27,20 +28,43 @@ import { reviewPdfRuntimePackages } from './src/main/reviewer/reviewPdfRuntimeDe
 const _require = createRequire(__filename);
 const DESKTOP_PACKAGE_VERSION = (_require('./package.json') as { version: string }).version;
 
-// ── 构建期身份(2026-07-17 Cindy 渠道分叉) ─────────────────────────────────────
-// 区域默认 global;中国大陆包由发布脚本显式注入 CINDY_AUTH_REGION=cn。appId 随区域
-// 派生(com.xd.cindycn / com.xd.cindy),必须与运行时 shared/brandRegion
-// (经 vite.main.config 的 VITE_CINDY_AUTH_REGION define 烘焙)同源——AUMID
-// 三位一体:NSIS appId = 运行时 setAppUserModelId = 快捷方式 AUMID。
-const CINDY_REGION = resolveCindyRegion(
+// ── 构建期身份(2026-07-17 Cindy 渠道分叉;2026-09 distribution profile 化) ─────
+// 发行身份分两层:
+//  1. CINDY_DISTRIBUTION_PROFILE(可选 env,FreeWorkBuddy self-hosting 新增)——
+//     缺省 = 官方路径,与历史行为逐字节一致;
+//  2. 官方路径内部仍由 CINDY_AUTH_REGION 选区域(默认 global)。
+// appId / exe / scheme / userData / updater 产物名一律从**本构建的 identity**
+// 派生(官方 = BRAND_IDENTITY 按区域取值;独立发行 = resolveDistributionProfile
+// 选中的 profile 经 resolveBrandIdentityFromProfile 派生)。独立的 self-host
+// 身份与官方并存(appId / scheme / userData / keychain 互不共享),详见
+// packages/maker-shared/src/distributionProfile.ts。
+const DISTRIBUTION_PROFILE = resolveDistributionProfile(
+  process.env.CINDY_DISTRIBUTION_PROFILE?.trim() || null,
   process.env.CINDY_AUTH_REGION?.trim() || process.env.VITE_CINDY_AUTH_REGION,
 );
 // 把归一化后的区域回写给 vite 构建(plugin-vite 与 forge 同进程,loadEnv 读
 // process.env):防止「只设 CINDY_AUTH_REGION 直跑 forge」时 NSIS appId 用
 // global 而 main 烘焙的 CURRENT_APP_ID 落回 cn——AUMID 漂移 = toast 静默丢失。
+// 独立发行没有区域概念,region 回落 global(仅供现有区域分支消费,身份值全部
+// 来自 profile 派生,与区域键无关)。
+const CINDY_REGION = DISTRIBUTION_PROFILE.region ?? resolveCindyRegion(null);
 process.env.VITE_CINDY_AUTH_REGION = CINDY_REGION;
-const CINDY_APP_ID = brandAppId(CINDY_REGION);
-const CINDY_UTI_PREFIX = brandBundleIdPrefix(CINDY_REGION);
+// 发行身份回写给 vite(vite.main.config 只透传这两个 VITE_ env,resolve 单点在
+// 本文件):运行时 brandRegion/deepLink/regionUserData 从这两个 define 取本构建
+// identity,保证 AUMID / deep link / userData 与打包身份同源。官方构建 identity
+// 为空串 → 运行时回落 BRAND_IDENTITY,产物行为不变。
+process.env.CINDY_DISTRIBUTION_PROFILE = DISTRIBUTION_PROFILE.distributionId;
+process.env.VITE_CINDY_DISTRIBUTION_ID = DISTRIBUTION_PROFILE.distributionId;
+process.env.VITE_CINDY_DISTRIBUTION_IDENTITY = DISTRIBUTION_PROFILE.region
+  ? ''
+  : JSON.stringify(resolveBrandIdentityFromProfile(DISTRIBUTION_PROFILE));
+// 本构建的系统身份(官方路径 = BRAND_IDENTITY 原样,区域差异保留;独立发行 =
+// by-region 三键同值的派生 identity)。forge 侧与运行时消费全部经它取值。
+const BUILD_IDENTITY: BrandIdentity = DISTRIBUTION_PROFILE.region
+  ? BRAND_IDENTITY
+  : resolveBrandIdentityFromProfile(DISTRIBUTION_PROFILE);
+const CINDY_APP_ID = BUILD_IDENTITY.appIdByRegion[CINDY_REGION];
+const CINDY_UTI_PREFIX = BUILD_IDENTITY.appIdByRegion[CINDY_REGION];
 /**
  * 可执行文件基名,按区域派生(cn/global 同值 'Cindy',dev 'CindyDev';
  * 2026-07-26 显示名统一决策,cn/global 文件层双装隔离随之放弃,见
@@ -48,9 +72,16 @@ const CINDY_UTI_PREFIX = brandBundleIdPrefix(CINDY_REGION);
  * 入口按同一区域切换(src/main/regionUserData.ts),两端从 brand-identity
  * 同源派生,cn/global 数据仍分库。
  */
-const CINDY_EXE = brandExecutableName(CINDY_REGION);
-/** 更新器二进制文件名(cindy-updater.exe)。 */
-const UPDATER_EXE = `${BRAND_IDENTITY.updaterName}.exe`;
+/**
+ * 可执行文件基名,从本构建 identity 派生(官方 cn/global 同值 'Cindy',
+ * dev 'CindyDev';2026-07-26 显示名统一决策,见 brandIdentity.ts
+ * executableNameByRegion doc;独立发行 = profile.brand.executableName)。
+ * 运行时 userData 目录由 main 入口按同一 identity 切换(src/main/regionUserData.ts),
+ * 两端同源派生,数据分库。
+ */
+const CINDY_EXE = BUILD_IDENTITY.executableNameByRegion[CINDY_REGION];
+/** 更新器二进制文件名(官方 cindy-updater.exe;独立发行 <distributionId>-updater.exe)。 */
+const UPDATER_EXE = `${BUILD_IDENTITY.updaterName}.exe`;
 
 // discord.js is externalized from the main Vite bundle because its circular
 // CommonJS graph crashes when Rollup reorders it. Its dependency tree contains
@@ -442,6 +473,9 @@ const isWin = process.platform === 'win32';
  */
 function buildCindyUpdater(): void {
   if (process.platform !== 'win32') return;
+  // 独立发行 updateMode 非 official:不构建 cindy-updater 通道(蓝图 §2.5:
+  // 更新关闭时不启动 updater;self-host 更新链走 Phase 3 自建发布面)。
+  if (DISTRIBUTION_PROFILE.updateMode !== 'official') return;
   console.log(`[forge:prePackage] Building ${UPDATER_EXE} (Rust + Tauri)...`);
 
   const updaterRoot = path.join(__dirname, 'cindy-updater', 'src-tauri');
@@ -671,6 +705,7 @@ function signPackagedExes(buildPath: string): void {
  */
 function applyMacPackagedDisplayName(buildPath: string, platform: string): void {
   if (platform !== 'darwin') return;
+  const displayName = BUILD_IDENTITY.displayName;
   const apps = fs.readdirSync(buildPath).filter((n) => n.endsWith('.app'));
   for (const appDir of apps) {
     const plistPath = path.join(buildPath, appDir, 'Contents', 'Info.plist');
@@ -681,14 +716,14 @@ function applyMacPackagedDisplayName(buildPath: string, platform: string): void 
     // 否则 Electron 找不到 Helper app(见函数头 ⚠️)。
     const key = 'CFBundleDisplayName';
     // packager 必写该键,Set 即可;Add 兜底防未来 packager 行为变化。
-    const set = spawnSync('/usr/libexec/PlistBuddy', ['-c', `Set :${key} Cindy`, plistPath]);
+    const set = spawnSync('/usr/libexec/PlistBuddy', ['-c', `Set :${key} ${displayName}`, plistPath]);
     if (set.status !== 0) {
-      const add = spawnSync('/usr/libexec/PlistBuddy', ['-c', `Add :${key} string Cindy`, plistPath]);
+      const add = spawnSync('/usr/libexec/PlistBuddy', ['-c', `Add :${key} string ${displayName}`, plistPath]);
       if (add.status !== 0) {
         throw new Error(`[forge:postPackage] PlistBuddy failed to set ${key} in ${plistPath}`);
       }
     }
-    console.log(`[forge:postPackage] mac display name → Cindy (${appDir}/Contents/Info.plist)`);
+    console.log(`[forge:postPackage] mac display name → ${displayName} (${appDir}/Contents/Info.plist)`);
   }
 }
 
@@ -1225,7 +1260,7 @@ const makers: ForgeConfig['makers'] = [
       categories: ['Development'],
       icon: path.join(__dirname, 'resources', 'icon.png'),
       // 双 scheme:cindy 主 + xdt-maker 兼容(老分享链接不死)。
-      mimeType: allDeepLinkSchemes().map((s) => `x-scheme-handler/${s}`),
+      mimeType: allDeepLinkSchemes(BUILD_IDENTITY).map((s) => `x-scheme-handler/${s}`),
       maintainer: 'Lizi <feedback@cindy.app>',
       // deb 包名规范要求小写;跟随区域 exe 名(cn/global cindy / dev cindydev)。
       name: CINDY_EXE.toLowerCase(),
@@ -1287,7 +1322,7 @@ if (isWin) {
         //
         // prepackaged 模式下 doPack 直接 return,extraMetadata 不会重写
         // 已由 electron-forge 打好的 app.asar 内 package.json。
-        extraMetadata: { description: BRAND_IDENTITY.displayName },
+        extraMetadata: { description: BUILD_IDENTITY.displayName },
         nsis: {
           oneClick: false,
           allowToChangeInstallationDirectory: true,
@@ -1343,13 +1378,13 @@ const config: ForgeConfig = {
     appBundleId: CINDY_APP_ID,
     // exe 资源元数据(任务管理器进程名、文件右键属性的显示层)。只影响展示,
     // 与 exe 文件名 / AUMID / userData 等标识符解耦;显示层两区共用 Cindy
-    // (与 mac 显示名口径一致)。FileDescription 走 BRAND_IDENTITY.displayName,
+    // (与 mac 显示名口径一致)。FileDescription 走 BUILD_IDENTITY.displayName,
     // 与 NSIS maker 的 extraMetadata.description 同一表达式——安装器/卸载器
     // 与主 exe 的「说明」字段必须同值,否则 dev 包会安装前后显示两个名字。
     win32metadata: {
-      CompanyName: 'XD',
-      ProductName: 'Cindy',
-      FileDescription: BRAND_IDENTITY.displayName,
+      CompanyName: DISTRIBUTION_PROFILE.brand.companyName,
+      ProductName: DISTRIBUTION_PROFILE.brand.productName,
+      FileDescription: BUILD_IDENTITY.displayName,
     },
     icon: 'resources/icon',
     // 自定义 URL scheme: xdt-maker://session/<id> | xdt-maker://project/<encoded-workingDir>
@@ -1359,7 +1394,7 @@ const config: ForgeConfig = {
     //          main/deepLink.ts registerDeepLinkProtocol()。
     protocols: [
       // 双 scheme 注册:cindy:// 主 + xdt-maker:// 永久兼容(存量分享链接不死)。
-      { name: 'Cindy Deep Link', schemes: [...allDeepLinkSchemes()] },
+      { name: `${BUILD_IDENTITY.displayName} Deep Link`, schemes: [...allDeepLinkSchemes(BUILD_IDENTITY)] },
     ],
     // macOS 文件夹右键 "打开方式 → Cindy" 入口:
     //   声明 app 能接受 public.folder, Finder 自动把 Cindy 出现在 "打开方式" 列表。
@@ -1373,21 +1408,21 @@ const config: ForgeConfig = {
     extendInfo: {
       NSMicrophoneUsageDescription: 'This app needs access to the microphone for voice input.',
       // agent 会话中访问受 TCC 保护的目录(桌面/文稿/下载)时，macOS 需要这些声明才能向
-      // 用户展示授权弹窗；缺失时系统直接静默拒绝，不弹窗。
+      // 用户展示授权弹窗；缺失时系统直接静默拒绝，不弹窗。文案随发行身份展示名走。
       NSDesktopFolderUsageDescription:
-        "Cindy's AI agent needs access to read and write files on your Desktop.",
+        `${BUILD_IDENTITY.displayName}'s AI agent needs access to read and write files on your Desktop.`,
       NSDocumentsFolderUsageDescription:
-        "Cindy's AI agent needs access to read and write files in your Documents folder.",
+        `${BUILD_IDENTITY.displayName}'s AI agent needs access to read and write files in your Documents folder.`,
       NSDownloadsFolderUsageDescription:
-        "Cindy's AI agent needs access to read and write files in your Downloads folder.",
+        `${BUILD_IDENTITY.displayName}'s AI agent needs access to read and write files in your Downloads folder.`,
       // 智能通讯录导入: 经 osascript 向"通讯录"发 Apple Events(只读拉取)。
       // 缺这条声明 macOS 会不弹授权窗直接拒绝(-1743), 用户只看到静默失败。
       NSAppleEventsUsageDescription:
-        'Cindy uses Apple Events to read Contacts you import and to add or update Contacts you explicitly export.',
+        `${BUILD_IDENTITY.displayName} uses Apple Events to read Contacts you import and to add or update Contacts you explicitly export.`,
       NSContactsUsageDescription:
-        'Cindy accesses Contacts only when you import them or explicitly export additions or updates.',
+        `${BUILD_IDENTITY.displayName} accesses Contacts only when you import them or explicitly export additions or updates.`,
       NSLocalNetworkUsageDescription:
-        'Cindy uses your local network to sync end-to-end encrypted Smart Contacts directly between your online desktop devices.',
+        `${BUILD_IDENTITY.displayName} uses your local network to sync end-to-end encrypted Smart Contacts directly between your online desktop devices.`,
       CFBundleDocumentTypes: [
         {
           CFBundleTypeName: 'Folder',

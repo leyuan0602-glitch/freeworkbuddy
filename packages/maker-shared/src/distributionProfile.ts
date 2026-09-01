@@ -25,7 +25,12 @@
  *  - apps/mobile/app.config.js(bundle / package / scheme / push identity)
  */
 
-import { BRAND_IDENTITY, type BrandIdentity, type CindyRegion } from './brandIdentity.js';
+import {
+  BRAND_IDENTITY,
+  resolveCindyRegion,
+  type BrandIdentity,
+  type CindyRegion,
+} from './brandIdentity.js';
 
 /**
  * 官方发行身份的 distributionId 集合。
@@ -519,4 +524,98 @@ export function assertDistributionProfile(profile: DistributionProfile): Distrib
     );
   }
   return profile;
+}
+
+// ---------------------------------------------------------------------------
+// FreeWorkBuddy self-host profile(蓝图 §3.7 形态 A:Local-first Desktop)
+// ---------------------------------------------------------------------------
+
+/**
+ * FreeWorkBuddy 独立发行 profile。
+ *
+ * owner 决策(2026-09-01,蓝图 §3.21 决策清单):
+ *  - 维护主体:个人维护者(leyuan0602-glitch);法律页面 Phase 2 部署前为
+ *    freeworkbuddy.me 占位 URL(校验只要求 https 形态);
+ *  - 首阶段 Local-first:endpoint manifest 为 embedded(不做网络自举),
+ *    托管能力 capabilityDefaults 全关;telemetry / update 全部 disabled;
+ *  - trustedEndpointDomains 是部署域占位信任根,embedded 模式下不参与
+ *    网络自举,供 Phase 2 切 remote 时复用同一 profile 结构。
+ * 机密(签名私钥 / keystore 密码)不在此处,由外部 secret 提供。
+ */
+export const SELFHOST_FREEWORKBUDDY_PROFILE: DistributionProfile = assertDistributionProfile(
+  Object.freeze({
+    distributionId: 'freeworkbuddy-selfhost',
+    authRealm: 'global',
+    crossRealmOrgLoginEnabled: false,
+    brand: Object.freeze({
+      productName: 'FreeWorkBuddy',
+      companyName: 'leyuan0602-glitch',
+      desktopAppId: 'me.freeworkbuddy.desktop',
+      iosBundleId: 'me.freeworkbuddy.ios',
+      androidPackage: 'me.freeworkbuddy.android',
+      executableName: 'FreeWorkBuddy',
+      urlSchemes: Object.freeze(['freeworkbuddy']),
+      userDataName: 'FreeWorkBuddy',
+      secureStorageNamespace: 'freeworkbuddy',
+      websiteUrl: 'https://freeworkbuddy.me',
+      // 法律页占位(Phase 2 随部署上线替换真实路径;构建期仅校验 https 形态)。
+      privacyUrl: 'https://freeworkbuddy.me/privacy',
+      termsUrl: 'https://freeworkbuddy.me/terms',
+    }),
+    endpointManifest: Object.freeze({
+      mode: 'embedded',
+      trustedEndpointDomains: Object.freeze(['freeworkbuddy.me']),
+    }),
+    capabilityDefaults: Object.freeze(
+      Object.fromEntries(DISTRIBUTION_CAPABILITY_KEYS.map((k) => [k, false])) as Record<
+        DistributionCapabilityKey,
+        boolean
+      >,
+    ),
+    telemetryPolicy: 'disabled',
+    updateMode: 'disabled',
+  }),
+);
+
+/**
+ * 独立发行 profile 注册表(构建期 env 引用 distributionId 选取)。
+ * 新增独立发行在此登记;不在此表且非官方三身份的 id 一律拒绝,
+ * 防止打错 env 静默产出身份错误的包(与 resolveCindyRegion 同策略)。
+ */
+export const SELFHOST_DISTRIBUTION_PROFILES: Readonly<Record<string, DistributionProfile>> =
+  Object.freeze({
+    'freeworkbuddy-selfhost': SELFHOST_FREEWORKBUDDY_PROFILE,
+  } as Record<string, DistributionProfile>);
+
+/**
+ * 构建期 profile 选取入口(forge / vite.config / 打包脚本共用;纯函数)。
+ *
+ *  - distributionId 缺省 → 官方路径,按 regionInput(= CINDY_AUTH_REGION 语义)
+ *    取官方 profile——现有官方构建行为逐字节不变;
+ *  - 官方 id(cindy-cn 等):与 regionInput 矛盾即抛错(防两个 env 各说各话);
+ *  - 独立发行 id → SELFHOST_DISTRIBUTION_PROFILES 注册表(已 assert);
+ *  - 未知 id → 抛错,绝不回退官方值(蓝图 §3.3:profile 缺身份即构建失败)。
+ */
+export function resolveDistributionProfile(
+  distributionId?: string | null,
+  regionInput?: string | null,
+): DistributionProfile {
+  const id = distributionId?.trim() || '';
+  if (!id) return OFFICIAL_DISTRIBUTION_PROFILES[resolveCindyRegion(regionInput)];
+  if ((OFFICIAL_DISTRIBUTION_IDS as readonly string[]).includes(id)) {
+    const region = id.slice('cindy-'.length) as CindyRegion;
+    // regionInput 缺省 = 调用方只声明了 distribution;两处都给出时必须一致。
+    if (regionInput?.trim() && resolveCindyRegion(regionInput) !== region) {
+      throw new Error(
+        `Distribution profile mismatch: distributionId=${id} but region=${resolveCindyRegion(regionInput)}`,
+      );
+    }
+    return OFFICIAL_DISTRIBUTION_PROFILES[region];
+  }
+  const profile = SELFHOST_DISTRIBUTION_PROFILES[id];
+  if (profile) return profile;
+  throw new Error(
+    `Unknown distribution profile: ${JSON.stringify(id)}; `
+      + `expected one of ${[...OFFICIAL_DISTRIBUTION_IDS, ...Object.keys(SELFHOST_DISTRIBUTION_PROFILES)].join(', ')}`,
+  );
 }

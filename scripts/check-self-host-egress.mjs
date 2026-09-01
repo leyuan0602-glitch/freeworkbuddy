@@ -27,11 +27,13 @@ const INVENTORY_PATH = 'docs/contracts/external-domain-inventory.json';
 const CATEGORIES = new Set([
   'official-cindy', 'model-provider', 'integration-provider', 'content-source',
   'diagram-service', 'doc-reference', 'cdn-asset', 'analytics', 'log-backend',
-  'package-registry', 'test-stub', 'local-address', 'unclassified',
+  'package-registry', 'test-stub', 'local-address', 'selfhost-deployment',
+  'unclassified',
 ]);
 const DISPOSITIONS = new Set([
   'official-runtime', 'user-configured-egress', 'feature-scoped-egress',
-  'build-injected', 'doc-only', 'test-stub', 'local-only', 'needs-triage',
+  'build-injected', 'doc-only', 'test-stub', 'local-only',
+  'selfhost-runtime', 'needs-triage',
 ]);
 
 function hostMatchesInventory(host, domains) {

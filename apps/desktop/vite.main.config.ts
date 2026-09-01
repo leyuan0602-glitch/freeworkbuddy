@@ -13,6 +13,10 @@ const loginFixturesStub = path.resolve(
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
+  // 发行身份(工作流 B):forge.config 是唯一 resolve 入口(同一 resolveDistributionProfile),
+  // 它把解析结果回写到 VITE_CINDY_DISTRIBUTION_ID / VITE_CINDY_DISTRIBUTION_IDENTITY
+  // (与 VITE_CINDY_AUTH_REGION 同模式);纯 vite 构建(不经 forge)由调用方注入 env。
+  // 官方路径未注入 ⇒ 空串 ⇒ 运行时回落 BRAND_IDENTITY,现有官方构建产物字节不变。
   // Local dev does not go through dev-remote-env.mjs, so provide the same
   // production service endpoints from the shared config at bundle time. An
   // explicit .env/process override still wins, while API/Auth keep their
@@ -39,6 +43,15 @@ export default defineConfig(({ mode }) => {
     define: {
       'import.meta.env.VITE_CINDY_AUTH_REGION': JSON.stringify(
         readViteEnv('VITE_CINDY_AUTH_REGION'),
+      ),
+      // 发行身份(工作流 B,main-only):distributionId 恒注入(官方为 cindy-* id);
+      // identity JSON 仅独立发行注入(官方为空串,运行时回落 BRAND_IDENTITY)。
+      // 消费单点:src/shared/brandRegion.ts → CURRENT_DISTRIBUTION_ID / CURRENT_BRAND_IDENTITY。
+      'import.meta.env.VITE_CINDY_DISTRIBUTION_ID': JSON.stringify(
+        env.VITE_CINDY_DISTRIBUTION_ID || process.env.VITE_CINDY_DISTRIBUTION_ID || '',
+      ),
+      'import.meta.env.VITE_CINDY_DISTRIBUTION_IDENTITY': JSON.stringify(
+        env.VITE_CINDY_DISTRIBUTION_IDENTITY || process.env.VITE_CINDY_DISTRIBUTION_IDENTITY || '',
       ),
       // 本区与对端的两份端点清单自举基址(业务端点已全部改走运行期清单,
       // 旧的 VITE_API_BASE_URL 等端点 define 随之退役)。dev 构建也注入 cn 值,

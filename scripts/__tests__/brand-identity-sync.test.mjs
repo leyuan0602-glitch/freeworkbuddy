@@ -153,3 +153,29 @@ test('distributionProfile OFFICIAL_TRUSTED_ENDPOINT_DOMAINS mirrors endpointMani
     '官方 endpoint 信任根漂移:两处必须同改',
   );
 });
+
+test('distribution profile 构建期 env 名在 forge 与 vite 两处一致', () => {
+  // FreeWorkBuddy self-hosting 工作流 B:构建期 profile 选取入口必须同源,
+  // 否则打包身份(bundle id / exe)与运行时烘烐身份(AUMID / deep link / userData)
+  // 会从两个 env 各自解读 → 身份撕裂。
+  const forgeSource = readSource('apps/desktop/forge.config.ts');
+  const viteSource = readSource('apps/desktop/vite.main.config.ts');
+  const runtimeSource = readSource('apps/desktop/src/shared/brandRegion.ts');
+  const mainEntrySource = readSource('apps/desktop/src/main/index.ts');
+  for (const env of ['VITE_CINDY_DISTRIBUTION_ID', 'VITE_CINDY_DISTRIBUTION_IDENTITY']) {
+    assert.ok(viteSource.includes(env), `vite.main.config 缺少发行身份 define: ${env}`);
+    assert.ok(runtimeSource.includes(env), `brandRegion.ts 未消费发行身份 define: ${env}`);
+    assert.ok(forgeSource.includes(`process.env.${env}`), `forge.config 未回写发行身份 env: ${env}`);
+  }
+  // 构建期 profile 选取 env:forge 是唯一 resolve 入口(单一事实源),vite 只透传。
+  assert.ok(forgeSource.includes('CINDY_DISTRIBUTION_PROFILE'), 'forge.config 未消费构建期 profile env');
+  assert.ok(
+    forgeSource.includes('resolveDistributionProfile'),
+    'forge.config 必须经 resolveDistributionProfile 选取 profile(单一事实源)',
+  );
+  // userData 切换点消费注入 identity(独立发行数据分库的运行时半边)。
+  assert.ok(
+    mainEntrySource.includes('CURRENT_BRAND_IDENTITY'),
+    'main 入口未把发行 identity 传入 regionUserData(独立发行 userData 分库失效)',
+  );
+});

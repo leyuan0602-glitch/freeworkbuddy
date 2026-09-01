@@ -11,6 +11,8 @@ import {
   OFFICIAL_DISTRIBUTION_PROFILES,
   officialProfileForRegion,
   resolveBrandIdentityFromProfile,
+  resolveDistributionProfile,
+  SELFHOST_FREEWORKBUDDY_PROFILE,
   validateDistributionProfile,
   type DistributionProfile,
 } from '../distributionProfile.js';
@@ -114,6 +116,69 @@ describe('official profiles(官方三身份回归)', () => {
 
   it('默认区域仍为 global(现有构建语义不变)', () => {
     expect(DEFAULT_CINDY_REGION).toBe('global');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 构建期 profile 选取入口(resolveDistributionProfile)
+// ---------------------------------------------------------------------------
+
+describe('resolveDistributionProfile(构建期 env 选取)', () => {
+  it('缺省 → 官方路径,region 输入语义与 resolveCindyRegion 一致', () => {
+    expect(resolveDistributionProfile(null, null)).toBe(OFFICIAL_DISTRIBUTION_PROFILES.global);
+    expect(resolveDistributionProfile(undefined, 'cn')).toBe(OFFICIAL_DISTRIBUTION_PROFILES.cn);
+    expect(resolveDistributionProfile('', 'dev')).toBe(OFFICIAL_DISTRIBUTION_PROFILES.dev);
+    // region 空白 → 默认 global
+    expect(resolveDistributionProfile(null, '  ')).toBe(OFFICIAL_DISTRIBUTION_PROFILES.global);
+  });
+
+  it('官方 id 直接选取;与 region 输入矛盾即抛错', () => {
+    expect(resolveDistributionProfile('cindy-cn', null)).toBe(OFFICIAL_DISTRIBUTION_PROFILES.cn);
+    expect(resolveDistributionProfile('cindy-global', 'global')).toBe(
+      OFFICIAL_DISTRIBUTION_PROFILES.global,
+    );
+    expect(() => resolveDistributionProfile('cindy-cn', 'global')).toThrow(/mismatch/i);
+    expect(() => resolveDistributionProfile('cindy-dev', 'cn')).toThrow(/mismatch/i);
+  });
+
+  it('独立发行 id → 注册表中的 self-host profile(已过 assert)', () => {
+    expect(resolveDistributionProfile('freeworkbuddy-selfhost', null)).toBe(
+      SELFHOST_FREEWORKBUDDY_PROFILE,
+    );
+    // 独立发行忽略 region 输入(与 CindyRegion 正交,不参与矛盾校验)
+    expect(resolveDistributionProfile('freeworkbuddy-selfhost', 'cn')).toBe(
+      SELFHOST_FREEWORKBUDDY_PROFILE,
+    );
+  });
+
+  it('未知 id 抛错,绝不回退官方值', () => {
+    expect(() => resolveDistributionProfile('no-such-profile', null)).toThrow(/Unknown distribution profile/);
+    expect(() => resolveDistributionProfile('CINDY-GLOBAL', null)).toThrow(/Unknown distribution profile/);
+  });
+
+  it('FreeWorkBuddy self-host profile:owner 决策值锁定(蓝图 §3.21)', () => {
+    expect(SELFHOST_FREEWORKBUDDY_PROFILE).toMatchObject({
+      distributionId: 'freeworkbuddy-selfhost',
+      authRealm: 'global',
+      crossRealmOrgLoginEnabled: false,
+      telemetryPolicy: 'disabled',
+      updateMode: 'disabled',
+    });
+    expect(SELFHOST_FREEWORKBUDDY_PROFILE.brand).toMatchObject({
+      productName: 'FreeWorkBuddy',
+      companyName: 'leyuan0602-glitch',
+      desktopAppId: 'me.freeworkbuddy.desktop',
+      urlSchemes: ['freeworkbuddy'],
+      userDataName: 'FreeWorkBuddy',
+      secureStorageNamespace: 'freeworkbuddy',
+    });
+    expect(SELFHOST_FREEWORKBUDDY_PROFILE.endpointManifest).toMatchObject({
+      mode: 'embedded',
+      trustedEndpointDomains: ['freeworkbuddy.me'],
+    });
+    for (const key of DISTRIBUTION_CAPABILITY_KEYS) {
+      expect(SELFHOST_FREEWORKBUDDY_PROFILE.capabilityDefaults[key]).toBe(false);
+    }
   });
 });
 

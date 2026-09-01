@@ -19,7 +19,8 @@
     "doc-only": "注释/文档/规范链接,运行时不发起请求。",
     "test-stub": "测试与文档桩域名,不构成真实 egress。",
     "local-only": "本机回环/开发地址/防护用例引用。",
-    "needs-triage": "自动发现未分类;不允许长期停留在该类别。"
+    "needs-triage": "自动发现未分类;不允许长期停留在该类别。",
+    "selfhost-runtime": "FreeWorkBuddy 独立发行自身的部署端点;官方 Cindy no-egress 目标不涉及本类别。"
   },
   "scanRoots": [
     "apps/desktop/src",
@@ -1420,6 +1421,13 @@
       "disposition": "official-runtime",
       "note": "skillhub-server (cn)",
       "officialParent": "cindy.com.cn"
+    },
+    {
+      "host": "freeworkbuddy.me",
+      "category": "selfhost-deployment",
+      "disposition": "selfhost-runtime",
+      "note": "FreeWorkBuddy 独立发行部署域(蓝图首域名)。当前仅出现在 distributionProfile 的占位法律 URL 与 embedded 信任根;Phase 2 部署服务后启用真实解析。",
+      "allowSubdomains": false
     },
     {
       "host": "cindy-mobile.local",
