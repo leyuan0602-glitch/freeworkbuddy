@@ -880,7 +880,7 @@ import {
 } from './model-access/index.js';
 import { effectiveXdGatewayBaseUrl } from './model-access/effectiveEndpoint.js';
 import { isLocalDbOwnerCurrent } from './appSessionPolicy.js';
-import { getAppCapabilities, requireAppCapability } from './appCapabilities.js';
+import { getAppCapabilities, registerAppCapabilitiesIpc, requireAppCapability } from './appCapabilities.js';
 import {
   activeOwnerScopeKey,
   beginAppSessionBoundary,
@@ -7971,6 +7971,7 @@ app.on('ready', async () => {
     return; // 用户在错误框选择退出,app.exit 已调用
   }
   registerClientEndpointsIpc();
+  registerAppCapabilitiesIpc();
 
   // 网关凭据自动下发:订阅登录态(登录后向 model-access-server 拉 endpoint +
   // 用户专属 key)+ 注册 model-access:* IPC。须在 initClientEndpoints 之后

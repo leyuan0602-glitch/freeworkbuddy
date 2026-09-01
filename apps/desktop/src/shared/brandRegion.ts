@@ -105,5 +105,25 @@ export const CURRENT_DISTRIBUTION_MANIFEST_SOURCE: DistributionManifestSource | 
   return injected ? parseInjectedManifestSource(injected) : null;
 })();
 
+/**
+ * 发行 capability 默认开关(工作流 E;蓝图 §2.5 计算链第二层)。
+ * 键集与 maker-shared distributionProfile 的 DISTRIBUTION_CAPABILITY_KEYS 一致
+ * (brand-identity-sync 镜像测试锁定)。官方构建为 null(无 distribution 覆盖)。
+ */
+export const CURRENT_DISTRIBUTION_CAPABILITY_DEFAULTS: Readonly<Record<string, boolean>> | null =
+  (() => {
+    const injected = import.meta.env?.VITE_CINDY_DISTRIBUTION_CAPABILITIES;
+    if (!injected) return null;
+    const parsed = JSON.parse(injected) as unknown;
+    if (
+      typeof parsed !== 'object'
+      || parsed === null
+      || !Object.values(parsed).every((v) => typeof v === 'boolean')
+    ) {
+      throw new Error('VITE_CINDY_DISTRIBUTION_CAPABILITIES: 注入的 capability 表结构非法');
+    }
+    return parsed as Record<string, boolean>;
+  })();
+
 /** 本构建的系统身份 id(Windows AUMID / macOS bundle id)。 */
 export const CURRENT_APP_ID: string = CURRENT_BRAND_IDENTITY.appIdByRegion[CURRENT_CINDY_REGION];

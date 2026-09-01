@@ -71,6 +71,11 @@ process.env.VITE_CINDY_DISTRIBUTION_MANIFEST_SOURCE = DISTRIBUTION_PROFILE.regio
         : { bootstrapUrl: DISTRIBUTION_PROFILE.endpointManifest.bootstrapUrl ?? '' }),
       trustedEndpointDomains: [...DISTRIBUTION_PROFILE.endpointManifest.trustedEndpointDomains],
     });
+// capability 默认开关(工作流 E):独立发行按 profile 的 capabilityDefaults 烘焙
+// (当前 Local-first 全关);官方留空(运行时无 distribution 覆盖,行为不变)。
+process.env.VITE_CINDY_DISTRIBUTION_CAPABILITIES = DISTRIBUTION_PROFILE.region
+  ? ''
+  : JSON.stringify(DISTRIBUTION_PROFILE.capabilityDefaults);
 // 本构建的系统身份(官方路径 = BRAND_IDENTITY 原样,区域差异保留;独立发行 =
 // by-region 三键同值的派生 identity)。forge 侧与运行时消费全部经它取值。
 const BUILD_IDENTITY: BrandIdentity = DISTRIBUTION_PROFILE.region
