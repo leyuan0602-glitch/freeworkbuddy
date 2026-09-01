@@ -44,7 +44,8 @@ const USER_DATA_DIR_NAME = extractLiteral(
  * 锚定到 `Object.freeze({` 赋值处:字段名可能还出现在 interface 声明里。
  */
 function extractRegionMap(source, mapName, label) {
-  const blockRe = new RegExp(`${mapName}\\s*[:=]\\s*Object\\.freeze\\(\\{([\\s\\S]*?)\\}\\)`);
+  // 名字与 Object.freeze 之间允许类型注解(如 `: Readonly<Record<...>> =`)。
+  const blockRe = new RegExp(`${mapName}\\s*[:=][^=]*?Object\\.freeze\\(\\{([\\s\\S]*?)\\}\\)`);
   const block = blockRe.exec(source);
   assert.ok(block, `pattern not found: ${label} (${blockRe})`);
   const map = {};
@@ -113,4 +114,42 @@ test('desktop package.json productName mirrors brandIdentity.userDataDirName', (
   // 的 XDT_USER_DATA_DIR 落在不同目录。
   const pkg = JSON.parse(readSource('apps/desktop/package.json'));
   assert.equal(pkg.productName, USER_DATA_DIR_NAME);
+});
+
+// ---- FreeWorkBuddy self-hosting 工作流 B(蓝图 §3.3):distributionProfile 镜像锁 ----
+// distributionProfile.ts 官方 profile 派生自 brandIdentity.ts,但法律链接与
+// endpoint 信任根在各自消费单点有独立字面量,此处锁定两处镜像不漂移。
+
+test('distributionProfile OFFICIAL_LEGAL_LINKS_BY_REGION mirrors desktop legalLinks.ts', () => {
+  // 镜像合同:distributionProfile.ts 的官方法律链接必须包含 legalLinks.ts 的
+  // 全部 URL 字面量;dev 归 cn 系的区域归属由 distributionProfile 的 vitest
+  // 快照测试锁定(这边只锁 URL 集合,避免解析嵌套结构)。
+  const profileSource = readSource('packages/maker-shared/src/distributionProfile.ts');
+  const legalSource = readSource('apps/desktop/src/shared/legalLinks.ts');
+  const legalUrls = [...legalSource.matchAll(/'(https:\/\/protocol\.xd\.(?:cn|com)\/[^']+)'/g)].map((m) => m[1]);
+  assert.ok(legalUrls.length >= 4, 'legalLinks.ts 字面量抽取异常');
+  for (const url of legalUrls) {
+    assert.ok(
+      profileSource.includes(url),
+      `legalLinks.ts 的链接未镜像进 distributionProfile.ts: ${url}`,
+    );
+  }
+});
+
+test('distributionProfile OFFICIAL_TRUSTED_ENDPOINT_DOMAINS mirrors endpointManifestCache REGION_ENDPOINT_DOMAIN', () => {
+  const profileSource = readSource('packages/maker-shared/src/distributionProfile.ts');
+  const block = /OFFICIAL_TRUSTED_ENDPOINT_DOMAINS[^=]*=\s*Object\.freeze\(\[([\s\S]*?)\]\)/.exec(profileSource);
+  assert.ok(block, 'OFFICIAL_TRUSTED_ENDPOINT_DOMAINS 字面量未找到');
+  const profileDomains = [...block[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  const cacheSource = readSource('apps/desktop/src/main/endpointManifestCache.ts');
+  const cacheBlock = /export const REGION_ENDPOINT_DOMAIN[^{]*\{([\s\S]*?)\}/.exec(cacheSource);
+  assert.ok(cacheBlock, 'endpointManifestCache REGION_ENDPOINT_DOMAIN 字面量未找到');
+  // 只取域名形状的字符串(类型注解里的 'cn'/'global' 键名要排除)。
+  const cacheDomains = [...new Set([...cacheBlock[1].matchAll(/'([^']+)'/g)].map((m) => m[1]).filter((v) => v.includes('.')))];
+  assert.ok(cacheDomains.length >= 2, 'REGION_ENDPOINT_DOMAIN 域名抽取异常');
+  assert.deepEqual(
+    [...profileDomains].sort(),
+    [...cacheDomains].sort(),
+    '官方 endpoint 信任根漂移:两处必须同改',
+  );
 });
