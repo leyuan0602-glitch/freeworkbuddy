@@ -44,6 +44,7 @@ import {
 } from './lib/homeMarketFilter';
 import { deriveSkillSource } from './lib/skillSource';
 import { InstallTargetPicker, type InstallTargetSkill } from './components/InstallTargetPicker';
+import { SkillIcon } from './components/SkillIcon';
 import { SkillhubMarketPreviewPanel } from './SkillhubMarketPreviewPanel';
 
 const KIND_ICON: Record<string, LucideIcon> = {
@@ -335,9 +336,12 @@ export function SkillhubHomeView({
                   {Array.from({ length: HOME_CATALOG_LIMIT }).map((_, i) => (
                     <div
                       key={i}
-                      className="flex h-[100px] flex-col gap-2 rounded-[12px] border-[0.5px] border-[var(--border-default)] bg-[var(--surface-elevated)] p-3 shadow-[var(--plugin-card-shadow)]"
+                      className="flex min-h-[100px] flex-col gap-2 rounded-[12px] border-[0.5px] border-[var(--border-default)] bg-[var(--surface-elevated)] p-3 shadow-[var(--plugin-card-shadow)]"
                     >
-                      <div className="h-3.5 w-2/3 animate-pulse rounded bg-[var(--cmd-palette-item-hover)] opacity-60" />
+                      <div className="flex items-center gap-2">
+                        <div className="size-9 shrink-0 animate-pulse rounded-xl bg-[var(--cmd-palette-item-hover)] opacity-60" />
+                        <div className="h-3.5 w-2/3 animate-pulse rounded bg-[var(--cmd-palette-item-hover)] opacity-60" />
+                      </div>
                       <div className="h-3 w-full animate-pulse rounded bg-[var(--cmd-palette-item-hover)] opacity-40" />
                       <div className="h-3 w-4/5 animate-pulse rounded bg-[var(--cmd-palette-item-hover)] opacity-40" />
                       <div className="mt-auto h-3 w-1/3 animate-pulse rounded bg-[var(--cmd-palette-item-hover)] opacity-40" />
@@ -365,6 +369,7 @@ export function SkillhubHomeView({
                       )}
                     >
                       <div className="flex items-center gap-2">
+                        <SkillIcon url={s.icon} />
                         <span className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--msg-assistant-text)]">
                           {s.displayName || s.name}
                         </span>
@@ -396,7 +401,6 @@ export function SkillhubHomeView({
           {/* ② 本地技能 */}
           {catalogTab === 'local' && (!normalizedQuery || visibleLocalCount > 0) ? (
             <section className="plugin-motion-page-section min-w-0">
-              <SkillSectionHeading title={t('skillhub.home.local')} count={visibleLocalCount} />
               {visibleLocalCount === 0 ? (
                 <div className="rounded-[12px] border-[0.5px] border-[var(--border-default)] px-4 py-5 text-13 leading-5 text-[var(--text-secondary)]">
                   {bootstrapped ? t('skillhub.home.localEmpty') : t('skillhub.welcome.scanning')}
@@ -405,7 +409,6 @@ export function SkillhubHomeView({
                 <div className="flex flex-col gap-6">
                   {globalSkills.length > 0 && (
                     <LocalGroup
-                      label={t('skillhub.home.globalScope')}
                       skills={globalSkills}
                       syncResults={syncResults}
                       onOpen={openLocal}
@@ -521,30 +524,13 @@ export function SkillhubHomeView({
   );
 }
 
-function SkillSectionHeading({
-  title,
-  count,
-}: {
-  title: string;
-  count: number;
-}) {
-  return (
-    <div className="mb-5 flex items-end justify-between gap-4">
-      <div className="flex min-w-0 items-baseline gap-2">
-        <h2 className="text-20 font-medium leading-tight text-[var(--text-primary)]">{title}</h2>
-        <span className="text-13 text-[var(--text-tertiary)]">{count}</span>
-      </div>
-    </div>
-  );
-}
-
 function LocalGroup({
   label,
   skills,
   syncResults,
   onOpen,
 }: {
-  label: string;
+  label?: string;
   skills: SkillhubSkill[];
   /** server 归属结果(含 isMine),用于历史遗留 registry(origin 缺失)的来源推断 */
   syncResults: Map<string, SkillhubSyncResult>;
@@ -553,7 +539,7 @@ function LocalGroup({
   const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-3">
-      <span className="px-1 text-13 font-medium text-[var(--text-secondary)]">{label}</span>
+      {label ? <span className="px-1 text-13 font-medium text-[var(--text-secondary)]">{label}</span> : null}
       <div className={cn('plugin-motion-stagger', PLUGIN_MANAGEMENT_CARD_GRID_CLASS)}>
         {skills.map((s) => {
           const Icon = KIND_ICON[s.kind] ?? Package;
@@ -581,9 +567,13 @@ function LocalGroup({
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]',
               )}
             >
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-[22%] border-[0.5px] border-[var(--border-default)] bg-[var(--surface-elevated)] text-[var(--text-primary)] shadow-[var(--plugin-card-shadow)]">
-                <Icon size={17} strokeWidth={1.75} />
-              </span>
+              {s.kind === 'skill' ? (
+                <SkillIcon />
+              ) : (
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-[22%] border-[0.5px] border-[var(--border-default)] bg-[var(--surface-elevated)] text-[var(--text-primary)] shadow-[var(--plugin-card-shadow)]">
+                  <Icon size={17} strokeWidth={1.75} />
+                </span>
+              )}
               <span className="flex min-w-0 flex-1 flex-col gap-1 pt-0.5">
                 <span className="flex min-w-0 items-center gap-2">
                   <span className="min-w-0 flex-1 truncate text-13 font-medium text-[var(--text-primary)]">

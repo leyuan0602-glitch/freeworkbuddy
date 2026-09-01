@@ -10175,6 +10175,7 @@
       }
     },
     "publishedStatus": {
+      "waitingReview": "심사 대기",
       "machineReviewing": "기계 심사 중",
       "manualReviewing": "수동 검토 중",
       "rejected": "심사 미통과"
@@ -10382,6 +10383,8 @@
       "dismiss": "확인",
       "passedTitle": "보안 스캔 통과",
       "passedDesc": "이 버전은 모든 보안 검사를 통과하여 마켓에 게시되었습니다.",
+      "pendingTitle": "제출 완료, 플랫폼 심사 대기 중",
+      "pendingDesc": "보안 스캔이 완료되었습니다. 플랫폼 승인 후 공개 마켓에 자동으로 게시됩니다.",
       "failedTitle": "보안 스캔 실패",
       "failedDesc": "이 버전은 보안 스캔 문제로 인해 {{status}}으로 표시되어 다른 사용자가 설치할 수 없습니다. 아래 문제를 수정한 후 다시 게시하세요.",
       "processingFailedTitle": "게시 처리 실패",
@@ -10398,6 +10401,7 @@
         "passed": "통과",
         "failed": "미통과",
         "warning": "확인 필요",
+        "waitingReview": "심사 대기",
         "reviewing": "심사 중",
         "unavailable": "사용 불가"
       },

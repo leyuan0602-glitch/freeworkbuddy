@@ -10175,6 +10175,7 @@
       }
     },
     "publishedStatus": {
+      "waitingReview": "審査待ち",
       "machineReviewing": "機械審査中",
       "manualReviewing": "人手確認中",
       "rejected": "審査不通過"
@@ -10382,6 +10383,8 @@
       "dismiss": "了解",
       "passedTitle": "セキュリティスキャン通過",
       "passedDesc": "このバージョンはすべてのセキュリティチェックに合格し、マーケットに公開されました。",
+      "pendingTitle": "送信済み、プラットフォーム審査待ち",
+      "pendingDesc": "セキュリティスキャンは完了しました。プラットフォームの承認後、公開マーケットに自動公開されます。",
       "failedTitle": "セキュリティスキャン不合格",
       "failedDesc": "このバージョンはセキュリティスキャンの問題により {{status}} としてマークされ、他のユーザーはインストールできません。以下の問題を修正して再公開してください。",
       "processingFailedTitle": "公開処理に失敗しました",
@@ -10398,6 +10401,7 @@
         "passed": "通過",
         "failed": "不合格",
         "warning": "要確認",
+        "waitingReview": "審査待ち",
         "reviewing": "審査中",
         "unavailable": "利用不可"
       },

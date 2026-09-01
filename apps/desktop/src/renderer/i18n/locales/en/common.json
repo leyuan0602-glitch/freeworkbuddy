@@ -10197,6 +10197,7 @@
       }
     },
     "publishedStatus": {
+      "waitingReview": "Awaiting review",
       "machineReviewing": "Machine review",
       "manualReviewing": "Manual review",
       "rejected": "Review rejected"
@@ -10404,6 +10405,8 @@
       "dismiss": "Got it",
       "passedTitle": "Security Scan Passed",
       "passedDesc": "This version has passed all security checks and is now live on the market.",
+      "pendingTitle": "Submitted for Platform Review",
+      "pendingDesc": "The security scan is complete. This version will be published to the public market after Platform approval.",
       "failedTitle": "Security Scan Failed",
       "failedDesc": "This version was marked as {{status}} due to security scan issues and cannot be installed by other users. Please fix the issues below and republish.",
       "processingFailedTitle": "Publication Processing Failed",
@@ -10420,6 +10423,7 @@
         "passed": "Passed",
         "failed": "Failed",
         "warning": "Needs attention",
+        "waitingReview": "Awaiting review",
         "reviewing": "In review",
         "unavailable": "Unavailable"
       },

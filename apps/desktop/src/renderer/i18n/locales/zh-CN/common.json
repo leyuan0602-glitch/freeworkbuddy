@@ -10167,6 +10167,7 @@
       }
     },
     "publishedStatus": {
+      "waitingReview": "等待审核",
       "machineReviewing": "机审中",
       "manualReviewing": "人工复核中",
       "rejected": "审核未通过"
@@ -10374,6 +10375,8 @@
       "dismiss": "知道了",
       "passedTitle": "安全扫描通过",
       "passedDesc": "该版本已通过所有安全检查，现已发布到市场。",
+      "pendingTitle": "已提交，等待平台审核",
+      "pendingDesc": "安全扫描已经完成，平台审核通过后会自动发布到公开市场。",
       "failedTitle": "安全扫描未通过",
       "failedDesc": "该版本因安全扫描不达标被标记为 {{status}}，暂时无法在市场中被其他用户安装。请修复以下问题后重新发布。",
       "processingFailedTitle": "发布处理失败",
@@ -10390,6 +10393,7 @@
         "passed": "已通过",
         "failed": "未通过",
         "warning": "有风险",
+        "waitingReview": "等待审核",
         "reviewing": "审核中",
         "unavailable": "暂不可用"
       },

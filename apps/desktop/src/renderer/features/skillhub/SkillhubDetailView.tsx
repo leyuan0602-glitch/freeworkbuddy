@@ -16,7 +16,7 @@
  */
 
 import * as Dialog from '@radix-ui/react-dialog';
-import { AlertCircle, AlertTriangle, ArrowLeft, ArrowUp, Bot, CheckCircle, ChevronDown, ChevronRight, FileText, Folder, FolderOpen, Globe, type LucideIcon, Package, Pencil, Save, Search, SquareTerminal, Trash2, Upload, X } from 'lucide-react';
+import { AlertCircle, AlertTriangle, ArrowLeft, ArrowUp, Bot, CheckCircle, ChevronDown, ChevronRight, Clock3, FileText, Folder, FolderOpen, Globe, type LucideIcon, Package, Pencil, Save, Search, SquareTerminal, Trash2, Upload, X } from 'lucide-react';
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -57,6 +57,7 @@ import {
   effectivePublishedStatus,
   isEffectiveActivePublishedReview,
   latestRejectedVersionFromVersions,
+  publishedStatusLabelKey,
   rejectedPublishedReviewFromVersions,
 } from './lib/publishedStatus';
 import { isPassingScanStatus } from './lib/scanStatus';
@@ -1200,7 +1201,8 @@ export function SkillhubDetailView() {
     return unsubscribe;
   }, [publishProgressTarget]);
 
-  // dialog 关闭后重新查当前 skill 远端状态；如果仍在审核中，下方 poll effect 会恢复轮询。
+  // dialog 关闭后重新查一次当前 skill 远端状态。进入人工审核后不再自动轮询，
+  // 用户主动刷新时由常规 info 请求读取最新状态。
   useEffect(() => {
     const wasOpen = previousPublishOpenRef.current;
     previousPublishOpenRef.current = publishOpen;
@@ -1228,20 +1230,6 @@ export function SkillhubDetailView() {
     (reviewVersion && publishedStatus
       ? { version: reviewVersion, status: publishedStatus }
       : null);
-
-  // 审核状态 scan 轮询：优先跟踪 pendingVersion,没有 pending 时回落到旧 moderationStatus。
-  useEffect(() => {
-    if (!isSkill || !entry?.name || !reviewVersion || publishOpen) return;
-
-    void window.electronAPI.skillhub.startScanPoll({
-      slug: entry.name,
-      version: reviewVersion,
-    });
-
-    return () => {
-      void window.electronAPI.skillhub.stopScanPoll();
-    };
-  }, [entry?.name, isSkill, publishOpen, reviewVersion]);
 
   // 按钮区/banner 数据就绪:info 落定 + hash 算完即可,不再依赖批量 sync。
   // 仅 isSkill 场景需要 hash;command/agent 直接视为 ready。
@@ -2063,8 +2051,12 @@ export function SkillhubDetailView() {
                     'transition-colors',
                   )}
                 >
-                  <Spinner size={14} />
-                  <span>{t('skillhub.detail.reviewing')}</span>
+                  {publishedStatus === 'pending' ? <Clock3 size={14} /> : <Spinner size={14} />}
+                  <span>
+                    {publishedStatus
+                      ? t(publishedStatusLabelKey(publishedStatus))
+                      : t('skillhub.detail.reviewing')}
+                  </span>
                 </button>
               ) : (
                 <span className={cn(
@@ -2104,8 +2096,12 @@ export function SkillhubDetailView() {
                       'transition-colors',
                     )}
                   >
-                    <Spinner size={14} />
-                    <span>{t('skillhub.detail.reviewing')}</span>
+                    {publishedStatus === 'pending' ? <Clock3 size={14} /> : <Spinner size={14} />}
+                    <span>
+                      {publishedStatus
+                        ? t(publishedStatusLabelKey(publishedStatus))
+                        : t('skillhub.detail.reviewing')}
+                    </span>
                   </button>
                 ) : (
                   <button

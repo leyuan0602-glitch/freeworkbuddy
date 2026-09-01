@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, Clock3, Download, Eye, Pencil, Trash2, type LucideIcon } from 'lucide-react';
 
@@ -20,36 +19,7 @@ import {
   publishedStatusClass,
   publishedStatusLabelKey,
 } from '../lib/publishedStatus';
-
-interface AuthorAvatarProps {
-  url: string | null;
-  initial: string;
-}
-
-/** 18x18 圆形头像（F-UI-1 设计稿 av 尺寸）。url 存在时优先 <img>;失败回落字母。 */
-function AuthorAvatar({ url, initial }: AuthorAvatarProps) {
-  const [errored, setErrored] = useState(false);
-  const showImage = !!url && !errored;
-
-  return (
-    <div
-      className="flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--chat-input-chip-bg)] font-medium text-[var(--msg-assistant-text)]"
-      style={{ width: '18px', height: '18px', fontSize: '10px' }}
-    >
-      {showImage ? (
-        <img
-          src={url!}
-          alt={initial}
-          className="h-full w-full object-cover"
-          onError={() => setErrored(true)}
-          referrerPolicy="no-referrer"
-        />
-      ) : (
-        initial
-      )}
-    </div>
-  );
-}
+import { SkillIcon } from './SkillIcon';
 
 function visibilityLabel(skill: MarketSkill, allowPrivateLabel: boolean): string {
   return i18n.t(marketVisibilityLabelKey({
@@ -201,9 +171,10 @@ export function MarketCard({
       style={{ gap: '10px', height: '220px', borderWidth: '1.5px' }}
     >
       {/* Title */}
-      <div className="flex w-full items-center" style={{ gap: '8px' }}>
+      <div className="flex w-full min-w-0 items-center" style={{ gap: '10px' }}>
+        <SkillIcon url={skill.icon} />
         <h3
-          className="truncate font-medium text-[var(--msg-assistant-text)]"
+          className="min-w-0 truncate font-medium text-[var(--msg-assistant-text)]"
           style={{ fontSize: '16px' }}
         >
           {skill.displayName || skill.name}
@@ -212,7 +183,6 @@ export function MarketCard({
 
       {/* Author · Version + Visibility tag */}
       <div className="flex w-full items-center" style={{ gap: '8px' }}>
-        <AuthorAvatar url={skill.authorAvatarUrl} initial={skill.avatarInitial} />
         <span className="text-[var(--cmd-palette-item-meta)]" style={{ fontSize: '12px' }}>
           {skill.authorName} · {versionStr}
         </span>

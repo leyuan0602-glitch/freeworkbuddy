@@ -6,7 +6,7 @@ describe('mapHubSkillInfoToDesktopInfo', () => {
   it('preserves category slugs from Hub detail responses', () => {
     const info = mapHubSkillInfoToDesktopInfo({
       slug: 'lark-task',
-      icon: 'https://skillhub.example.test/assets/default-skill-icon.svg',
+      icon: 'https://skillhub.example.test/assets/default-skill-icon-v4.svg',
       displayName: 'Lark Task',
       summary: 'Market summary',
       description: 'Manage tasks',
@@ -23,7 +23,7 @@ describe('mapHubSkillInfoToDesktopInfo', () => {
     });
 
     expect(info.categories).toEqual(['engine', 'office']);
-    expect(info.icon).toBe('https://skillhub.example.test/assets/default-skill-icon.svg');
+    expect(info.icon).toBe('https://skillhub.example.test/assets/default-skill-icon-v4.svg');
     expect(info.description).toBe('Market summary');
     expect(info.downloads).toBe(135);
   });
