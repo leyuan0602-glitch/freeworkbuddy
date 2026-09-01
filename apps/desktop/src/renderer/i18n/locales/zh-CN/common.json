@@ -10376,6 +10376,8 @@
       "passedDesc": "该版本已通过所有安全检查，现已发布到市场。",
       "failedTitle": "安全扫描未通过",
       "failedDesc": "该版本因安全扫描不达标被标记为 {{status}}，暂时无法在市场中被其他用户安装。请修复以下问题后重新发布。",
+      "processingFailedTitle": "发布处理失败",
+      "processingFailedDesc": "该版本已上传，但服务器在处理发布时发生内部错误。这不是安全检查拒绝，请稍后重新发布。",
       "copyReviewResult": "复制审核结果",
       "copiedReviewResult": "已复制",
       "copyReviewResultFailed": "复制失败",
@@ -10393,7 +10395,8 @@
       },
       "gateLabel": {
         "llmReview": "LLM 审核",
-        "securityScan": "安全扫描"
+        "securityScan": "安全扫描",
+        "publicationProcessing": "发布处理"
       }
     },
     "diffPanel": {

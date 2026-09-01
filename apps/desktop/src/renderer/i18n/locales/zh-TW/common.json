@@ -10376,6 +10376,8 @@
       "passedDesc": "該版本已通過所有安全檢查，現已釋出到市場。",
       "failedTitle": "安全掃描未通過",
       "failedDesc": "該版本因安全掃描不達標被標記為 {{status}}，暫時無法在市場中被其他使用者安裝。請修復以下問題後重新發布。",
+      "processingFailedTitle": "發布處理失敗",
+      "processingFailedDesc": "該版本已上傳，但伺服器處理發布時發生內部錯誤。這不是安全檢查拒絕，請稍後重新發布。",
       "copyReviewResult": "複製稽核結果",
       "copiedReviewResult": "已複製",
       "copyReviewResultFailed": "複製失敗",
@@ -10393,7 +10395,8 @@
       },
       "gateLabel": {
         "llmReview": "LLM 稽核",
-        "securityScan": "安全掃描"
+        "securityScan": "安全掃描",
+        "publicationProcessing": "發布處理"
       }
     },
     "diffPanel": {

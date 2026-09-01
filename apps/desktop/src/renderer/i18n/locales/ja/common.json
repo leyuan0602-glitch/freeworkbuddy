@@ -10384,6 +10384,8 @@
       "passedDesc": "このバージョンはすべてのセキュリティチェックに合格し、マーケットに公開されました。",
       "failedTitle": "セキュリティスキャン不合格",
       "failedDesc": "このバージョンはセキュリティスキャンの問題により {{status}} としてマークされ、他のユーザーはインストールできません。以下の問題を修正して再公開してください。",
+      "processingFailedTitle": "公開処理に失敗しました",
+      "processingFailedDesc": "このバージョンはアップロードされましたが、サーバーの公開処理中に内部エラーが発生しました。セキュリティチェックによる拒否ではありません。時間をおいて再公開してください。",
       "copyReviewResult": "審査結果をコピー",
       "copiedReviewResult": "コピー済み",
       "copyReviewResultFailed": "コピーに失敗しました",
@@ -10401,7 +10403,8 @@
       },
       "gateLabel": {
         "llmReview": "LLM 審査",
-        "securityScan": "セキュリティスキャン"
+        "securityScan": "セキュリティスキャン",
+        "publicationProcessing": "公開処理"
       }
     },
     "diffPanel": {

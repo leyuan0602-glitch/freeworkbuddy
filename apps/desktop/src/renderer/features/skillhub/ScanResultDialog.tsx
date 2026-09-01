@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import type { ScanResultPayload } from './PublishDialog';
 import { isPassingScanStatus } from './lib/scanStatus';
+import { isPublicationProcessingFailure } from './lib/scanResultPresentation';
 
 interface ScanIssue {
   severity?: string;
@@ -83,6 +84,9 @@ function scanGateLabel(gate: ScanGate, t: TFunction): string {
   if (code === 'security-scan' || code === 'scan-status') {
     return t('skillhub.scanResult.gateLabel.securityScan');
   }
+  if (code === 'internal-error') {
+    return t('skillhub.scanResult.gateLabel.publicationProcessing');
+  }
   return gate.name;
 }
 
@@ -124,13 +128,18 @@ export function ScanResultDialog({ open, onClose, result }: ScanResultDialogProp
 
   const passed = isPassingScanStatus(result.status);
   const failedGates = (result.gates ?? []).filter((g) => g.status !== 'pass');
+  const processingFailure = !passed && isPublicationProcessingFailure(result.gates);
   const title = passed
     ? t('skillhub.scanResult.passedTitle')
-    : t('skillhub.scanResult.failedTitle', { status: result.status });
+    : processingFailure
+      ? t('skillhub.scanResult.processingFailedTitle')
+      : t('skillhub.scanResult.failedTitle', { status: result.status });
   const statusLabel = scanStatusLabel(result.status, t);
   const description = passed
     ? t('skillhub.scanResult.passedDesc')
-    : t('skillhub.scanResult.failedDesc', { status: statusLabel });
+    : processingFailure
+      ? t('skillhub.scanResult.processingFailedDesc')
+      : t('skillhub.scanResult.failedDesc', { status: statusLabel });
   const footerButtonBaseClass = cn(
     'inline-flex h-9 min-w-[104px] items-center justify-center gap-1.5 rounded-full px-5',
     'text-sm font-medium leading-none',
@@ -193,6 +202,10 @@ export function ScanResultDialog({ open, onClose, result }: ScanResultDialogProp
             {passed ? (
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--diff-add-bg)]">
                 <ShieldCheck size={22} className="text-[var(--diff-add-fg)]" />
+              </div>
+            ) : processingFailure ? (
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--warning-bg-soft)]">
+                <AlertTriangle size={22} className="text-[var(--warning-fg)]" />
               </div>
             ) : (
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--error-bg)]">

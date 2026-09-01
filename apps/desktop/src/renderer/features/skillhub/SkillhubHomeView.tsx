@@ -3,10 +3,7 @@
  *
  * 重构(2026-06):SkillHub 不再用"左侧树导航 + 右侧内容"。左侧 app 侧栏还给
  * 项目/对话列表;技能整页在右侧主区,无常驻导航树,改为下钻(下一步)+ 回退:
- *   - Skill Hub 入口  → 完整 Market 浏览页(/skillhub/market)
- *   - 推荐安装的技能   → market trending 前 N,点选 → market 页(预览/安装)
- *   - 本地技能         → 已安装/本地的 skill/command/agent,点 → 详情页
- * 三块都是整页内容卡片/列表;首页是栈底,自身无返回。
+ * 公开、可选的组织目录和本地技能在同一行切换；“更多”进入完整 Market。
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -30,7 +27,6 @@ import {
   PluginManagementLayout,
   PluginManagementPage,
 } from '@/features/plugin/PluginManagementLayout';
-import { canAccessSkillhubMarket } from './lib/marketAccess';
 import { buildLocalSkillRoute, findLocalSkillByPath } from './lib/localRoutes';
 import { refresh as refreshSkillhub, useSkillhub } from './hooks/useSkillhub';
 import { useMarketList, type MarketSkill } from './hooks/useMarketList';
@@ -42,7 +38,8 @@ import {
   homeMarketQuery,
   isHomeMarketResponseCurrent,
   matchesHomeMarketFilter,
-  visibleHomeMarketFilters,
+  visibleHomeCatalogTabs,
+  type HomeCatalogTab,
   type HomeMarketFilter,
 } from './lib/homeMarketFilter';
 import { deriveSkillSource } from './lib/skillSource';
@@ -76,12 +73,11 @@ export function SkillhubHomeView({
   const [query, setQuery] = useState('');
   const normalizedQuery = query.trim().toLocaleLowerCase();
 
-  // 登录后所有账号都请求 SkillHub;数据可见范围由服务端按已验证身份决定。
-  // 未登录 / 本地模式没有云端凭证,只显示本地技能。
+  // 未登录也请求公开 Skill 目录；登录身份只扩大服务端可见范围。
   const { user } = useAuth();
-  const marketAllowed = canAccessSkillhubMarket(user);
   const showOrganization = user?.membershipKind === 'org';
-  const [marketFilter, setMarketFilter] = useState<HomeMarketFilter>('public');
+  const [catalogTab, setCatalogTab] = useState<HomeCatalogTab>('public');
+  const marketFilter: HomeMarketFilter = catalogTab === 'organization' ? 'organization' : 'public';
   const marketRequest = useMemo(() => homeMarketQuery(marketFilter), [marketFilter]);
 
   // 主 Skill Tab 只展示各云端目录的首批摘要，完整分页仍由 SkillHub 市场页承担。
@@ -96,7 +92,7 @@ export function SkillhubHomeView({
     setVisibility,
     reload: reloadMarket,
   } = useMarketList('all', {
-    enabled: marketAllowed,
+    enabled: catalogTab !== 'local',
     initialScope: 'market',
     initialSort: 'trending',
   });
@@ -109,8 +105,8 @@ export function SkillhubHomeView({
     setSearchQuery(query);
   }, [query, setSearchQuery]);
   useEffect(() => {
-    if (!showOrganization && marketFilter === 'organization') setMarketFilter('public');
-  }, [marketFilter, showOrganization]);
+    if (!showOrganization && catalogTab === 'organization') setCatalogTab('public');
+  }, [catalogTab, showOrganization]);
   const marketResponseCurrent = isHomeMarketResponseCurrent(marketRequest, {
     scope: resolvedScope,
     mine: resolvedMine,
@@ -172,7 +168,9 @@ export function SkillhubHomeView({
       globalSkills.length + projectGroups.reduce((count, group) => count + group.skills.length, 0),
     [globalSkills.length, projectGroups],
   );
-  const hasSearchResults = (marketAllowed && catalogItems.length > 0) || visibleLocalCount > 0;
+  const hasSearchResults = catalogTab === 'local'
+    ? visibleLocalCount > 0
+    : catalogItems.length > 0;
 
   // 推荐技能的预览浮层 + 安装选择器(复用 Market 那套):点推荐卡 = 下一步直接
   // 进入该技能的预览;关闭 = 回退到首页。
@@ -201,14 +199,14 @@ export function SkillhubHomeView({
     setPickerOpen(true);
   };
   const management = useMarketManagement({
-    active: marketFilter === 'mine',
+    active: false,
     reload: reloadMarket,
     onClone: handleClone,
     onDeleted: (skill) => {
       if (previewSkill?.name === skill.name) setPreviewSkill(null);
     },
   });
-  const homeMarketFilters = visibleHomeMarketFilters(showOrganization);
+  const homeCatalogTabs = visibleHomeCatalogTabs(showOrganization);
 
   const handleImportSkill = useCallback(async () => {
     if (importBusy) return;
@@ -283,37 +281,34 @@ export function SkillhubHomeView({
                 {t('skillhub.home.title')}
               </h1>
               <p className="mt-2 max-w-2xl text-14 leading-6 text-[var(--text-secondary)]">
-                {t(
-                  marketAllowed
-                    ? 'skillhub.home.description'
-                    : 'skillhub.home.descriptionLocalOnly',
-                )}
+                {t('skillhub.home.description')}
               </p>
             </div>
-            {marketAllowed ? (
-              <div
-                className="flex min-w-0 max-w-full flex-wrap items-center justify-end gap-1"
-                role="group"
-                aria-label={t('skillhub.home.catalogFiltersAria')}
-              >
-                {homeMarketFilters.map((filter) => (
+            <div
+              className="flex min-w-0 max-w-full flex-wrap items-center justify-end gap-1"
+              role="group"
+              aria-label={t('skillhub.home.catalogFiltersAria')}
+            >
+                {homeCatalogTabs.map((tab) => (
                   <button
-                    key={filter}
+                    key={tab}
                     type="button"
-                    aria-pressed={marketFilter === filter}
+                    aria-pressed={catalogTab === tab}
                     onClick={() => {
                       setPreviewSkill(null);
-                      setMarketFilter(filter);
+                      setCatalogTab(tab);
                     }}
                     className={cn(
                       'shrink-0 select-none rounded-full px-3.5 py-2 text-12 transition-colors duration-150',
                       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]',
-                      marketFilter === filter
+                      catalogTab === tab
                         ? 'bg-[var(--surface-chip)] font-medium text-[var(--text-primary)]'
                         : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover-soft)] hover:text-[var(--text-primary)]',
                     )}
                   >
-                    {t(`skillhub.home.catalogFilter.${filter}`)}
+                    {tab === 'local'
+                      ? t('skillhub.home.local')
+                      : t(`skillhub.home.catalogFilter.${tab}`)}
                   </button>
                 ))}
                 <button
@@ -328,12 +323,11 @@ export function SkillhubHomeView({
                   {t('skillhub.home.catalogMore')}
                   <ChevronRight size={13} strokeWidth={1.8} aria-hidden="true" />
                 </button>
-              </div>
-            ) : null}
+            </div>
           </header>
 
-          {/* ① 云端目录摘要(仅市场可见账号) */}
-          {marketAllowed && (!normalizedQuery || catalogItems.length > 0 || marketLoading) ? (
+          {/* ① 当前云端目录摘要 */}
+          {catalogTab !== 'local' && (!normalizedQuery || catalogItems.length > 0 || marketLoading) ? (
             <section className="plugin-motion-page-section min-w-0">
               {(marketLoading || !marketResponseCurrent) && catalogItems.length === 0 ? (
                 // 占位骨架:与真实卡片同栅格、同行数、同高度,内容到位后原地替换不跳动。
@@ -400,7 +394,7 @@ export function SkillhubHomeView({
           ) : null}
 
           {/* ② 本地技能 */}
-          {!normalizedQuery || visibleLocalCount > 0 ? (
+          {catalogTab === 'local' && (!normalizedQuery || visibleLocalCount > 0) ? (
             <section className="plugin-motion-page-section min-w-0">
               <SkillSectionHeading title={t('skillhub.home.local')} count={visibleLocalCount} />
               {visibleLocalCount === 0 ? (
@@ -431,7 +425,7 @@ export function SkillhubHomeView({
             </section>
           ) : null}
 
-          {normalizedQuery && !marketLoading && !hasSearchResults ? (
+          {normalizedQuery && (catalogTab === 'local' || !marketLoading) && !hasSearchResults ? (
             <div className="plugin-motion-page-section rounded-[12px] border-[0.5px] border-[var(--border-default)] px-4 py-8 text-center text-13 leading-5 text-[var(--text-secondary)]">
               {t('skillhub.home.noSearchResults')}
             </div>
@@ -445,10 +439,10 @@ export function SkillhubHomeView({
           skill={previewSkill}
           onClose={() => setPreviewSkill(null)}
           primaryAction={
-            previewSkill
+            previewSkill && user
               ? marketCardPrimaryAction({
                   isMine: previewSkill.isMine,
-                  listVisibility: marketFilter === 'mine' ? 'mine' : 'all',
+                  listVisibility: 'all',
                   cardState: previewSkill.cardState,
                 })
               : 'none'

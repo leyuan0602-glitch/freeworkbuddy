@@ -9,13 +9,11 @@
  */
 import { serverApiFetch, type ApiFetchOptions } from '../serverApiClient';
 import { getClientEndpoint } from '../clientEndpointsService';
-import { requireAppCapability } from '../appCapabilities.js';
 
 export function skillhubApiFetch<T>(
   apiPath: string,
   opts: Omit<ApiFetchOptions, 'baseUrl'> = {},
 ): Promise<T> {
-  requireAppCapability('canUseSkillHubCloud', 'SkillHub cloud requires a Cindy account.');
   return serverApiFetch<T>(apiPath, {
     ...opts,
     // 新客户端绝不回退旧 skillhubApiBaseUrl：XD 身份的只读兼容由新服务自己

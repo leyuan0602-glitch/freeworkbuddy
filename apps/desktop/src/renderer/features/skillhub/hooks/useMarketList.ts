@@ -274,7 +274,7 @@ export function useMarketList(
   options?: {
     /**
      * false 时完全不发市场请求(items 保持空、loading 保持 false)。
-     * 供未登录 / 本地模式跳过云端请求与骨架屏；登录后自动补拉。
+     * 供本地技能 Tab 跳过云端请求与骨架屏；切回云端目录后自动补拉。
      */
     enabled?: boolean;
     /** Initial server-side catalog partition; `all` preserves historical behavior. */

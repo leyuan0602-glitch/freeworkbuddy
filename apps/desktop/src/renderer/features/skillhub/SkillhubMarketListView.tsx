@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Search, ChevronDown, ArrowLeft } from 'lucide-react';
 import {
@@ -28,7 +28,6 @@ import { marketCardPrimaryAction } from './lib/marketDetailViewModel';
 import { groupMineByOwner } from './lib/mineGrouping';
 import { nextMarketPreviewName } from './lib/marketPreviewSelection';
 import { syncMarketPreviewSelection } from './lib/marketPreviewSync';
-import { canAccessSkillhubMarket } from './lib/marketAccess';
 import { useAuth } from '@/contexts/AuthContext';
 import { CATEGORY_ALL } from '../../../shared/skillhubCategory';
 
@@ -70,21 +69,13 @@ function FilterChip({
   );
 }
 
-/**
- * 未登录 / 本地模式没有 SkillHub 云端凭证，深链返回本地技能首页。
- * 登录后不再做组织白名单判断；Skill 数据的可见范围由服务端决定。
- * 登录态初始化期间(user 尚未水合)不误判，先按原样渲染。
- */
 export function SkillhubMarketListView() {
-  const { user, isInitializing } = useAuth();
-  if (!isInitializing && !canAccessSkillhubMarket(user)) {
-    return <Navigate to="/skillhub/local" replace />;
-  }
   return <SkillhubMarketListViewInner />;
 }
 
 function SkillhubMarketListViewInner() {
   const { t } = useTranslation();
+  const { user, isInitializing } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const marketState = location.state as { freshEntry?: boolean; initialVisibility?: Visibility } | null;
@@ -132,6 +123,10 @@ function SkillhubMarketListViewInner() {
     isFreshEntry ? null : getMarketSelected()?.name ?? null,
   );
   const [previewSkill, setPreviewSkill] = useState<MarketSkill | null>(null);
+
+  useEffect(() => {
+    if (!isInitializing && !user && visibility === 'mine') setVisibility('all');
+  }, [isInitializing, setVisibility, user, visibility]);
 
   useEffect(() => {
     if (isFreshEntry) {
@@ -250,11 +245,13 @@ function SkillhubMarketListViewInner() {
     <MarketCard
       key={skill.name}
       skill={skill}
-      primaryAction={marketCardPrimaryAction({
-        isMine: skill.isMine,
-        listVisibility: visibility,
-        cardState: skill.cardState,
-      })}
+      primaryAction={user
+        ? marketCardPrimaryAction({
+            isMine: skill.isMine,
+            listVisibility: visibility,
+            cardState: skill.cardState,
+          })
+        : 'none'}
       allowPrivateVisibilityLabel={visibility === 'mine'}
       onClone={handleClone}
       onManageAction={management.handleManageAction}
@@ -383,11 +380,13 @@ function SkillhubMarketListViewInner() {
             label={t('skillhub.market.chipAll')}
             onClick={() => setVisibility('all')}
           />
-          <FilterChip
-            active={visibility === 'mine'}
-            label={t('skillhub.market.chipMine')}
-            onClick={() => setVisibility('mine')}
-          />
+          {user ? (
+            <FilterChip
+              active={visibility === 'mine'}
+              label={t('skillhub.market.chipMine')}
+              onClick={() => setVisibility('mine')}
+            />
+          ) : null}
         </div>
       </div>
 
@@ -489,7 +488,7 @@ function SkillhubMarketListViewInner() {
         open={previewSkill !== null}
         skill={previewSkill}
         onClose={handlePreviewClose}
-        primaryAction={previewSkill
+        primaryAction={previewSkill && user
           ? marketCardPrimaryAction({
             isMine: previewSkill.isMine,
             listVisibility: visibility,

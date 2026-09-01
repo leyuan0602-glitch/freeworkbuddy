@@ -1,6 +1,7 @@
 import type { CatalogScope, MarketSkill, SortBy, Visibility } from '../hooks/useMarketList';
 
-export type HomeMarketFilter = 'public' | 'organization' | 'mine';
+export type HomeMarketFilter = 'public' | 'organization';
+export type HomeCatalogTab = HomeMarketFilter | 'local';
 
 export interface HomeMarketQuery {
   scope: CatalogScope;
@@ -8,8 +9,10 @@ export interface HomeMarketQuery {
   sort: SortBy;
 }
 
-export function visibleHomeMarketFilters(showOrganization: boolean): HomeMarketFilter[] {
-  return showOrganization ? ['public', 'organization', 'mine'] : ['public', 'mine'];
+export function visibleHomeCatalogTabs(
+  showOrganization: boolean,
+): HomeCatalogTab[] {
+  return showOrganization ? ['public', 'organization', 'local'] : ['public', 'local'];
 }
 
 export function isHomeMarketResponseCurrent(
@@ -24,9 +27,6 @@ export function homeMarketQuery(filter: HomeMarketFilter): HomeMarketQuery {
   if (filter === 'organization') {
     return { scope: 'team', visibility: 'all', sort: 'trending' };
   }
-  if (filter === 'mine') {
-    return { scope: 'all', visibility: 'mine', sort: 'updated_at' };
-  }
   return { scope: 'market', visibility: 'all', sort: 'trending' };
 }
 
@@ -35,7 +35,6 @@ export function matchesHomeMarketFilter(
   skill: Pick<MarketSkill, 'isMine' | 'ownerType' | 'publishedVisibility' | 'visibility'>,
   filter: HomeMarketFilter,
 ): boolean {
-  if (filter === 'mine') return skill.isMine;
   if (filter === 'public') {
     return skill.publishedVisibility === 'public'
       || (skill.publishedVisibility === undefined && skill.visibility === 'PUBLIC');

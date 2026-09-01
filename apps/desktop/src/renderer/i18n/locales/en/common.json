@@ -10406,6 +10406,8 @@
       "passedDesc": "This version has passed all security checks and is now live on the market.",
       "failedTitle": "Security Scan Failed",
       "failedDesc": "This version was marked as {{status}} due to security scan issues and cannot be installed by other users. Please fix the issues below and republish.",
+      "processingFailedTitle": "Publication Processing Failed",
+      "processingFailedDesc": "This version was uploaded, but the server encountered an internal error while processing it. It was not rejected by a security check; please republish later.",
       "copyReviewResult": "Copy review result",
       "copiedReviewResult": "Copied",
       "copyReviewResultFailed": "Copy failed",
@@ -10423,7 +10425,8 @@
       },
       "gateLabel": {
         "llmReview": "LLM review",
-        "securityScan": "Security scan"
+        "securityScan": "Security scan",
+        "publicationProcessing": "Publication processing"
       }
     },
     "diffPanel": {

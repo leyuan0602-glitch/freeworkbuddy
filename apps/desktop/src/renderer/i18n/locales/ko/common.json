@@ -10384,6 +10384,8 @@
       "passedDesc": "이 버전은 모든 보안 검사를 통과하여 마켓에 게시되었습니다.",
       "failedTitle": "보안 스캔 실패",
       "failedDesc": "이 버전은 보안 스캔 문제로 인해 {{status}}으로 표시되어 다른 사용자가 설치할 수 없습니다. 아래 문제를 수정한 후 다시 게시하세요.",
+      "processingFailedTitle": "게시 처리 실패",
+      "processingFailedDesc": "이 버전은 업로드되었지만 서버가 게시 처리 중 내부 오류를 만났습니다. 보안 검사에서 거부된 것이 아니므로 잠시 후 다시 게시하세요.",
       "copyReviewResult": "심사 결과 복사",
       "copiedReviewResult": "복사됨",
       "copyReviewResultFailed": "복사 실패",
@@ -10401,7 +10403,8 @@
       },
       "gateLabel": {
         "llmReview": "LLM 심사",
-        "securityScan": "보안 스캔"
+        "securityScan": "보안 스캔",
+        "publicationProcessing": "게시 처리"
       }
     },
     "diffPanel": {
