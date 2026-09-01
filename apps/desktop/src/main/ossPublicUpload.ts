@@ -88,6 +88,10 @@ export async function uploadPublicAsset(
   if (!token) {
     return { ok: false, stage: 'presign', status: 0, code: 'NOT_AUTHENTICATED' };
   }
+  // 工作流 E:oss 端点未部署(独立发行)时受控拒绝,不发请求。
+  if (!deps.getBaseUrl()) {
+    return { ok: false, stage: 'presign', status: 0, code: 'CAPABILITY_UNAVAILABLE' };
+  }
 
   let presign: PresignPutResponse;
   try {

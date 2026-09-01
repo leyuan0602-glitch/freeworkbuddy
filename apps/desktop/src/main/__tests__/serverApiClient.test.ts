@@ -36,6 +36,13 @@ describe('serverApiFetch', () => {
     vi.clearAllMocks();
   });
 
+  it('工作流 E:baseUrl 为空(端点未部署)时受控拒绝,不发请求', async () => {
+    await expect(
+      serverApiFetch('/api/plugins', { baseUrl: () => '' }),
+    ).rejects.toMatchObject({ code: 'ENDPOINT_UNAVAILABLE', statusCode: 503 });
+    expect(mocks.netFetch).not.toHaveBeenCalled();
+  });
+
   it('TOKEN_EXPIRED refresh 后用新 token 和重新生成的 body 重试', async () => {
     mocks.getAccessToken.mockReturnValueOnce('token-a').mockReturnValueOnce('token-b');
     mocks.refresh.mockResolvedValue(true);

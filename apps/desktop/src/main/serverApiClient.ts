@@ -78,6 +78,16 @@ interface RawResponse<T> {
 
 async function rawFetch<T>(apiPath: string, opts: ApiFetchOptions): Promise<RawResponse<T>> {
   const baseUrl = typeof opts.baseUrl === 'function' ? opts.baseUrl() : opts.baseUrl;
+  // 工作流 E(蓝图 §2.5):未部署能力的端点为空时**受控拒绝**,不发请求、
+  // 不把相对 URL 的 TypeError 折叠成网络错。消费方的现有错误处理路径
+  // (ServerApiError 捕获)按未部署能力呈现。
+  if (!baseUrl) {
+    throw new ServerApiError(
+      'ENDPOINT_UNAVAILABLE',
+      503,
+      `Endpoint for ${apiPath} is not deployed in this distribution`,
+    );
+  }
   const url = baseUrl + apiPath;
   const method = opts.method ?? 'GET';
   const headers: Record<string, string> = {
