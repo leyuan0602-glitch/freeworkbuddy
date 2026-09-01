@@ -32,6 +32,7 @@ import { useSkillhub } from './useSkillhub';
 import { semverCompare } from '../versionUtils';
 
 export type SortBy = 'trending' | 'downloads' | 'updated_at' | 'created_at';
+export type CatalogScope = 'all' | 'market' | 'team';
 /** 'all' 表示不筛分类（显示全部）；其他值是 MarketCategory.slug。 */
 export type CategoryFilter = typeof CATEGORY_ALL | string;
 /**
@@ -241,6 +242,8 @@ interface MarketListState {
   loadingMore: boolean;
   error: string | null;
   nextCursor: string | null;
+  resolvedScope: CatalogScope | null;
+  resolvedMine: boolean | null;
 }
 
 const INITIAL: MarketListState = {
@@ -249,12 +252,15 @@ const INITIAL: MarketListState = {
   loadingMore: false,
   error: null,
   nextCursor: null,
+  resolvedScope: null,
+  resolvedMine: null,
 };
 
 interface FetchMarketPageInput {
   cursor?: string;
   sort: SortBy;
   q: string;
+  scope: CatalogScope;
   mine: boolean;
   category?: string;
 }
@@ -271,12 +277,19 @@ export function useMarketList(
      * 供未登录 / 本地模式跳过云端请求与骨架屏；登录后自动补拉。
      */
     enabled?: boolean;
+    /** Initial server-side catalog partition; `all` preserves historical behavior. */
+    initialScope?: CatalogScope;
+    /** Fixed catalog surfaces can avoid an extra request by declaring their initial sort. */
+    initialSort?: SortBy;
   },
 ) {
   const enabled = options?.enabled ?? true;
   const { t, i18n: i18next } = useTranslation();
   const [searchQuery, setSearchQueryState] = useState('');
-  const [sortBy, setSortByState] = useState<SortBy>('updated_at');
+  const [sortBy, setSortByState] = useState<SortBy>(() => options?.initialSort ?? 'updated_at');
+  const [catalogScope, setCatalogScopeState] = useState<CatalogScope>(
+    () => options?.initialScope ?? 'all',
+  );
   const [categoryFilter, setCategoryFilterState] = useState<CategoryFilter>(CATEGORY_ALL);
   // 默认 'available'：进入 Market 直接看"对自己有用"的内容。
   const [visibility, setVisibilityState] = useState<Visibility>(() => initialVisibility);
@@ -332,6 +345,7 @@ export function useMarketList(
       limit: PAGE_SIZE,
       sort: params.sort,
       q: params.q || undefined,
+      scope: params.scope,
       mine: params.mine,
       available: false,
       category: params.category,
@@ -358,6 +372,7 @@ export function useMarketList(
         cursor,
         sort: params.sort,
         q: params.q,
+        scope: params.scope,
         mine: params.mine,
         category: params.category,
       });
@@ -379,13 +394,21 @@ export function useMarketList(
   }, [requestMarketPage]);
 
   const fetchPage = useCallback(
-    async (params: { sort: SortBy; q: string; mine: boolean; available: boolean; category?: string }) => {
+    async (params: {
+      sort: SortBy;
+      q: string;
+      scope: CatalogScope;
+      mine: boolean;
+      available: boolean;
+      category?: string;
+    }) => {
       const myId = ++requestIdRef.current;
       setState((prev) => ({ ...prev, loading: true, error: null }));
       try {
         const res = await collectVisiblePage({
           sort: params.sort,
           q: params.q,
+          scope: params.scope,
           mine: params.mine,
           available: params.available,
           category: params.category,
@@ -398,6 +421,8 @@ export function useMarketList(
             loadingMore: false,
             error: res.error ?? i18n.t('skillhub.market.installError'),
             nextCursor: null,
+            resolvedScope: params.scope,
+            resolvedMine: params.mine,
           });
           return;
         }
@@ -407,6 +432,8 @@ export function useMarketList(
           loadingMore: false,
           error: null,
           nextCursor: res.nextCursor ?? null,
+          resolvedScope: params.scope,
+          resolvedMine: params.mine,
         });
       } catch (err) {
         if (myId !== requestIdRef.current) return;
@@ -416,6 +443,8 @@ export function useMarketList(
           loadingMore: false,
           error: err instanceof Error ? err.message : String(err),
           nextCursor: null,
+          resolvedScope: params.scope,
+          resolvedMine: params.mine,
         });
       }
     },
@@ -434,6 +463,7 @@ export function useMarketList(
         cursor,
         sort: sortBy,
         q: searchQuery,
+        scope: catalogScope,
         mine: visibility === 'mine',
         available: visibility === 'available',
         category: categoryFilter !== CATEGORY_ALL ? categoryFilter : undefined,
@@ -453,7 +483,7 @@ export function useMarketList(
       if (myId !== requestIdRef.current) return;
       setState((prev) => ({ ...prev, loadingMore: false }));
     }
-  }, [state.nextCursor, state.loadingMore, state.loading, sortBy, searchQuery, visibility, categoryFilter, collectVisiblePage]);
+  }, [state.nextCursor, state.loadingMore, state.loading, sortBy, searchQuery, catalogScope, visibility, categoryFilter, collectVisiblePage]);
 
   // 外部主动刷新(删除/改可见性后)→ bump tick 触发重拉
   const [reloadTick, setReloadTick] = useState(0);
@@ -466,11 +496,12 @@ export function useMarketList(
     void fetchPage({
       sort: sortBy,
       q: searchQuery,
+      scope: catalogScope,
       mine: visibility === 'mine',
       available: visibility === 'available',
       category: categoryFilter !== CATEGORY_ALL ? categoryFilter : undefined,
     });
-  }, [enabled, sortBy, searchQuery, visibility, categoryFilter, fetchPage, reloadTick]);
+  }, [enabled, sortBy, searchQuery, catalogScope, visibility, categoryFilter, fetchPage, reloadTick]);
 
   // 当本地扫描结果或 installing 集合变化时,只重新派生 cardState/installedVersion,不重发请求。
   // 依赖键用 (name, version, installing) 序列化字符串，避免对象引用变化导致每次都跑。
@@ -517,6 +548,7 @@ export function useMarketList(
 
   const setSearchQuery = useCallback((q: string) => setSearchQueryState(q), []);
   const setSortBy = useCallback((s: SortBy) => setSortByState(s), []);
+  const setCatalogScope = useCallback((scope: CatalogScope) => setCatalogScopeState(scope), []);
   const setCategoryFilter = useCallback((slug: CategoryFilter) => setCategoryFilterState(slug), []);
   const setVisibility = useCallback((v: Visibility) => setVisibilityState(v), []);
 
@@ -545,12 +577,16 @@ export function useMarketList(
     loadingMore: state.loadingMore,
     error: state.error,
     hasMore: state.nextCursor !== null,
+    resolvedScope: state.resolvedScope,
+    resolvedMine: state.resolvedMine,
     searchQuery,
     sortBy,
+    catalogScope,
     categoryFilter,
     visibility,
     setSearchQuery,
     setSortBy,
+    setCatalogScope,
     setCategoryFilter,
     setVisibility,
     loadMore,

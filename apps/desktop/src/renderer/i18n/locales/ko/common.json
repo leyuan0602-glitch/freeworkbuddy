@@ -9950,8 +9950,14 @@
       "noSearchResults": "일치하는 스킬을 찾을 수 없습니다",
       "browseTitle": "Skill Hub 둘러보기",
       "browseDesc": "더 많은 스킬을 찾아 설치하세요",
-      "recommended": "추천",
-      "recommendedEmpty": "현재 추천 항목이 없습니다",
+      "catalog": "SkillHub",
+      "catalogFiltersAria": "SkillHub 카테고리",
+      "catalogFilter": {
+        "public": "공개",
+        "organization": "조직",
+        "mine": "관리 대상"
+      },
+      "catalogEmpty": "이 카테고리에 스킬이 없습니다",
       "local": "로컬 스킬",
       "localEmpty": "아직 로컬 스킬이 없습니다",
       "installed": "설치됨",

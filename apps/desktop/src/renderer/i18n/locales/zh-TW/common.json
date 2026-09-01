@@ -9942,8 +9942,14 @@
       "noSearchResults": "沒有找到匹配的技能",
       "browseTitle": "瀏覽 Skill Hub",
       "browseDesc": "發現並安裝更多技能",
-      "recommended": "推薦安裝",
-      "recommendedEmpty": "暫無推薦",
+      "catalog": "SkillHub",
+      "catalogFiltersAria": "SkillHub 分類",
+      "catalogFilter": {
+        "public": "公開",
+        "organization": "組織",
+        "mine": "我的管理"
+      },
+      "catalogEmpty": "目前分類暫無技能",
       "local": "本地技能",
       "localEmpty": "還沒有本地技能",
       "installed": "已安裝",

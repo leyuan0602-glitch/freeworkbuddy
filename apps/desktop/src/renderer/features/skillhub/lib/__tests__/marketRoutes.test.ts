@@ -49,7 +49,7 @@ describe('market route scope', () => {
     expect(previewSource).toContain('readPublishedFile');
     expect(previewSource).toContain('allowPrivilegedLinks={false}');
     expect(previewSource).toContain('ManageMenu');
-    expect(listSource).toContain('onManageAction={handleManageAction}');
+    expect(listSource).toContain('onManageAction={management.handleManageAction}');
     expect(previewSource).not.toContain('previewMarket');
   });
 

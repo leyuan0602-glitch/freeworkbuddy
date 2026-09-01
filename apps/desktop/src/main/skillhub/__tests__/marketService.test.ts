@@ -143,6 +143,22 @@ describe('SkillhubMarketService', () => {
     });
   });
 
+  it('passes public and organization catalog scopes to the Hub', async () => {
+    const { fetch, calls } = makeFetch([
+      { items: [makeHubSkill('public-skill')], total: 1 },
+      { items: [makeHubSkill('organization-skill', { visibility: 'shared' })], total: 1 },
+    ]);
+    const service = new SkillhubMarketService({ fetch });
+
+    await service.listMarket({ scope: 'market', sort: 'trending' });
+    await service.listMarket({ scope: 'team', sort: 'trending' });
+
+    expect(calls.map((call) => call.path)).toEqual([
+      '/api/skills-hub/skills?page=1&pageSize=24&sort=trending&order=desc&scope=market',
+      '/api/skills-hub/skills?page=1&pageSize=24&sort=trending&order=desc&scope=team',
+    ]);
+  });
+
   it('builds detail, file preview, visibility, and scan routes', async () => {
     const { fetch, calls } = makeFetch([
       makeHubSkill('demo/skill'),

@@ -45,6 +45,7 @@ export interface ListMarketParams {
   limit?: number;
   sort?: 'trending' | 'downloads' | 'updated_at' | 'created_at';
   q?: string;
+  scope?: 'all' | 'market' | 'team';
   mine?: boolean;
   available?: boolean;
   category?: string;
@@ -114,7 +115,7 @@ export class SkillhubMarketService {
       };
     }
 
-    search.set('scope', 'all');
+    search.set('scope', params?.scope ?? 'all');
     const qs = search.toString();
     const hubResult = await this.fetch<{ items: HubSkillInfoForDesktop[]; total: number }>(
       params?.available

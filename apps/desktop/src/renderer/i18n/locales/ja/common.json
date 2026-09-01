@@ -9950,8 +9950,14 @@
       "noSearchResults": "一致するスキルが見つかりません",
       "browseTitle": "Skill Hub を見る",
       "browseDesc": "もっと多くのスキルを見つけてインストール",
-      "recommended": "おすすめ",
-      "recommendedEmpty": "現在おすすめはありません",
+      "catalog": "SkillHub",
+      "catalogFiltersAria": "SkillHub カテゴリ",
+      "catalogFilter": {
+        "public": "公開",
+        "organization": "組織",
+        "mine": "管理対象"
+      },
+      "catalogEmpty": "このカテゴリにはスキルがありません",
       "local": "ローカルスキル",
       "localEmpty": "ローカルスキルはまだありません",
       "installed": "インストール済み",

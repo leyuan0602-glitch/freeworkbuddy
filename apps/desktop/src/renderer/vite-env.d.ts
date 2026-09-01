@@ -3149,6 +3149,7 @@ interface ElectronAPI {
       limit?: number;
       sort?: 'trending' | 'downloads' | 'updated_at' | 'created_at';
       q?: string;
+      scope?: 'all' | 'market' | 'team';
       mine?: boolean;
       /** Legacy: Hub-side available filtering switch. Current renderer keeps this false and filters locally. */
       available?: boolean;

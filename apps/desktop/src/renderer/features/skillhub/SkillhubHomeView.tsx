@@ -9,7 +9,7 @@
  * 三块都是整页内容卡片/列表;首页是栈底,自身无返回。
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -35,9 +35,17 @@ import { canAccessSkillhubMarket } from './lib/marketAccess';
 import { buildLocalSkillRoute, findLocalSkillByPath } from './lib/localRoutes';
 import { refresh as refreshSkillhub, useSkillhub } from './hooks/useSkillhub';
 import { useMarketList, type MarketSkill } from './hooks/useMarketList';
+import { MarketManagementDialogs, useMarketManagement } from './hooks/useMarketManagement';
 import { basename, deriveProjectWorkingDir } from './lib/pathDerivations';
 import { projectHash } from './lib/projectHash';
 import { marketCardPrimaryAction } from './lib/marketDetailViewModel';
+import {
+  homeMarketQuery,
+  isHomeMarketResponseCurrent,
+  matchesHomeMarketFilter,
+  visibleHomeMarketFilters,
+  type HomeMarketFilter,
+} from './lib/homeMarketFilter';
 import { deriveSkillSource } from './lib/skillSource';
 import { InstallTargetPicker, type InstallTargetSkill } from './components/InstallTargetPicker';
 import { SkillhubMarketPreviewPanel } from './SkillhubMarketPreviewPanel';
@@ -48,8 +56,8 @@ const KIND_ICON: Record<string, LucideIcon> = {
   agent: Bot,
 };
 
-/** 推荐区展示条数(market trending 前 N)。 */
-const RECOMMENDED_LIMIT = 8;
+/** 主 Skill Tab 每个云端目录最多展示的条数。 */
+const HOME_CATALOG_LIMIT = 8;
 
 function includesSkillQuery(values: ReadonlyArray<string | undefined>, query: string): boolean {
   if (!query) return true;
@@ -73,27 +81,53 @@ export function SkillhubHomeView({
   // 未登录 / 本地模式没有云端凭证,只显示本地技能。
   const { user } = useAuth();
   const marketAllowed = canAccessSkillhubMarket(user);
+  const showOrganization = user?.membershipKind === 'org';
+  const [marketFilter, setMarketFilter] = useState<HomeMarketFilter>('public');
+  const marketRequest = useMemo(() => homeMarketQuery(marketFilter), [marketFilter]);
 
-  // 推荐 = market trending 前 N(默认排序是 updated_at,挂载时切到 trending)。
+  // 主 Skill Tab 只展示各云端目录的首批摘要，完整分页仍由 SkillHub 市场页承担。
   const {
     items: marketItems,
     loading: marketLoading,
+    resolvedScope,
+    resolvedMine,
+    setSearchQuery,
     setSortBy,
-  } = useMarketList('available', { enabled: marketAllowed });
+    setCatalogScope,
+    setVisibility,
+    reload: reloadMarket,
+  } = useMarketList('all', {
+    enabled: marketAllowed,
+    initialScope: 'market',
+    initialSort: 'trending',
+  });
   useEffect(() => {
-    setSortBy('trending');
-  }, [setSortBy]);
-  const recommended = useMemo(
+    setCatalogScope(marketRequest.scope);
+    setVisibility(marketRequest.visibility);
+    setSortBy(marketRequest.sort);
+  }, [marketRequest, setCatalogScope, setSortBy, setVisibility]);
+  useEffect(() => {
+    setSearchQuery(query);
+  }, [query, setSearchQuery]);
+  useEffect(() => {
+    if (!showOrganization && marketFilter === 'organization') setMarketFilter('public');
+  }, [marketFilter, showOrganization]);
+  const marketResponseCurrent = isHomeMarketResponseCurrent(marketRequest, {
+    scope: resolvedScope,
+    mine: resolvedMine,
+  });
+  const catalogItems = useMemo(
     () =>
-      marketItems
+      (marketResponseCurrent ? marketItems : [])
+        .filter((skill) => matchesHomeMarketFilter(skill, marketFilter))
         .filter((skill) =>
           includesSkillQuery(
             [skill.displayName, skill.name, skill.description, skill.authorName],
             normalizedQuery,
           ),
         )
-        .slice(0, RECOMMENDED_LIMIT),
-    [marketItems, normalizedQuery],
+        .slice(0, HOME_CATALOG_LIMIT),
+    [marketFilter, marketItems, marketResponseCurrent, normalizedQuery],
   );
 
   // 本地技能:global 一组 + 每个 project 一组(displayName 取自 store.projects,兜底 basename)。
@@ -139,7 +173,7 @@ export function SkillhubHomeView({
       globalSkills.length + projectGroups.reduce((count, group) => count + group.skills.length, 0),
     [globalSkills.length, projectGroups],
   );
-  const hasSearchResults = (marketAllowed && recommended.length > 0) || visibleLocalCount > 0;
+  const hasSearchResults = (marketAllowed && catalogItems.length > 0) || visibleLocalCount > 0;
 
   // 推荐技能的预览浮层 + 安装选择器(复用 Market 那套):点推荐卡 = 下一步直接
   // 进入该技能的预览;关闭 = 回退到首页。
@@ -162,11 +196,20 @@ export function SkillhubHomeView({
     });
   };
   const openMarket = () => navigate('/skillhub/market');
-  const openRecommended = (skill: MarketSkill) => setPreviewSkill(skill);
+  const openCatalogSkill = (skill: MarketSkill) => setPreviewSkill(skill);
   const handleClone = (skill: MarketSkill) => {
     setPickerSkill(skill);
     setPickerOpen(true);
   };
+  const management = useMarketManagement({
+    active: marketFilter === 'mine',
+    reload: reloadMarket,
+    onClone: handleClone,
+    onDeleted: (skill) => {
+      if (previewSkill?.name === skill.name) setPreviewSkill(null);
+    },
+  });
+  const homeMarketFilters = visibleHomeMarketFilters(showOrganization);
 
   const handleImportSkill = useCallback(async () => {
     if (importBusy) return;
@@ -280,17 +323,44 @@ export function SkillhubHomeView({
             </button>
           ) : null}
 
-          {/* ② 推荐安装(仅市场可见账号) */}
-          {marketAllowed && (!normalizedQuery || recommended.length > 0 || marketLoading) ? (
+          {/* ② 云端目录摘要(仅市场可见账号) */}
+          {marketAllowed && (!normalizedQuery || catalogItems.length > 0 || marketLoading) ? (
             <section className="plugin-motion-page-section min-w-0">
               <SkillSectionHeading
-                title={t('skillhub.home.recommended')}
-                count={recommended.length}
-              />
-              {marketLoading && recommended.length === 0 ? (
+                title={t('skillhub.home.catalog')}
+                count={catalogItems.length}
+              >
+                <div
+                  className="flex min-w-0 max-w-full items-center gap-1"
+                  role="group"
+                  aria-label={t('skillhub.home.catalogFiltersAria')}
+                >
+                  {homeMarketFilters.map((filter) => (
+                    <button
+                      key={filter}
+                      type="button"
+                      aria-pressed={marketFilter === filter}
+                      onClick={() => {
+                        setPreviewSkill(null);
+                        setMarketFilter(filter);
+                      }}
+                      className={cn(
+                        'shrink-0 select-none rounded-full px-3.5 py-2 text-12 transition-colors duration-150',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]',
+                        marketFilter === filter
+                          ? 'bg-[var(--surface-chip)] font-medium text-[var(--text-primary)]'
+                          : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover-soft)] hover:text-[var(--text-primary)]',
+                      )}
+                    >
+                      {t(`skillhub.home.catalogFilter.${filter}`)}
+                    </button>
+                  ))}
+                </div>
+              </SkillSectionHeading>
+              {(marketLoading || !marketResponseCurrent) && catalogItems.length === 0 ? (
                 // 占位骨架:与真实卡片同栅格、同行数、同高度,内容到位后原地替换不跳动。
                 <div className={PLUGIN_MANAGEMENT_CARD_GRID_CLASS} aria-hidden>
-                  {Array.from({ length: RECOMMENDED_LIMIT }).map((_, i) => (
+                  {Array.from({ length: HOME_CATALOG_LIMIT }).map((_, i) => (
                     <div
                       key={i}
                       className="flex h-[100px] flex-col gap-2 rounded-[12px] border-[0.5px] border-[var(--border-default)] bg-[var(--surface-elevated)] p-3 shadow-[var(--plugin-card-shadow)]"
@@ -302,17 +372,17 @@ export function SkillhubHomeView({
                     </div>
                   ))}
                 </div>
-              ) : recommended.length === 0 ? (
+              ) : catalogItems.length === 0 ? (
                 <div className="rounded-[12px] border-[0.5px] border-[var(--border-default)] px-4 py-5 text-13 leading-5 text-[var(--text-secondary)]">
-                  {t('skillhub.home.recommendedEmpty')}
+                  {t('skillhub.home.catalogEmpty')}
                 </div>
               ) : (
                 <div className={cn('plugin-motion-stagger', PLUGIN_MANAGEMENT_CARD_GRID_CLASS)}>
-                  {recommended.map((s) => (
+                  {catalogItems.map((s) => (
                     <button
                       key={s.name}
                       type="button"
-                      onClick={() => openRecommended(s)}
+                      onClick={() => openCatalogSkill(s)}
                       className={cn(
                         'group flex min-h-[100px] flex-col gap-1.5 rounded-[12px] border-[0.5px] border-[var(--border-default)]',
                         'bg-[var(--surface-elevated)] p-3 text-left shadow-[var(--plugin-card-shadow)]',
@@ -400,13 +470,15 @@ export function SkillhubHomeView({
             previewSkill
               ? marketCardPrimaryAction({
                   isMine: previewSkill.isMine,
-                  listVisibility: 'available',
+                  listVisibility: marketFilter === 'mine' ? 'mine' : 'all',
                   cardState: previewSkill.cardState,
                 })
               : 'none'
           }
           onClone={handleClone}
+          onManageAction={management.handleManageAction}
         />
+        <MarketManagementDialogs controller={management} />
         <InstallTargetPicker
           open={pickerOpen}
           skill={pickerSkill}
@@ -477,13 +549,22 @@ export function SkillhubHomeView({
   );
 }
 
-function SkillSectionHeading({ title, count }: { title: string; count: number }) {
+function SkillSectionHeading({
+  title,
+  count,
+  children,
+}: {
+  title: string;
+  count: number;
+  children?: ReactNode;
+}) {
   return (
     <div className="mb-5 flex items-end justify-between gap-4">
       <div className="flex min-w-0 items-baseline gap-2">
         <h2 className="text-20 font-medium leading-tight text-[var(--text-primary)]">{title}</h2>
         <span className="text-13 text-[var(--text-tertiary)]">{count}</span>
       </div>
+      {children}
     </div>
   );
 }

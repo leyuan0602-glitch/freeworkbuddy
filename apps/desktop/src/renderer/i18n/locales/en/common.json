@@ -9972,8 +9972,14 @@
       "noSearchResults": "No matching skills found",
       "browseTitle": "Browse Skill Hub",
       "browseDesc": "Discover and install more skills",
-      "recommended": "Recommended",
-      "recommendedEmpty": "No recommendations right now",
+      "catalog": "SkillHub",
+      "catalogFiltersAria": "SkillHub categories",
+      "catalogFilter": {
+        "public": "Public",
+        "organization": "Organization",
+        "mine": "Managed"
+      },
+      "catalogEmpty": "No skills in this category",
       "local": "Local Skills",
       "localEmpty": "No local skills yet",
       "installed": "Installed",
