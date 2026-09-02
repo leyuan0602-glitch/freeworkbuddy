@@ -68,6 +68,7 @@ import { useMacFullscreen } from '@/hooks/useMacFullscreen';
 import { useRightSidebarResize } from '@/hooks/useRightSidebarResize';
 import { isSecondaryWindow } from '@/lib/secondaryWindow';
 import { useUpdateNotice } from '@/hooks/useUpdateNotice';
+import { useAppCapabilities } from '@/hooks/useAppCapabilities';
 import { syncNotificationsEnabledToMain } from '@/hooks/useNotificationSettings';
 import {
   isAgentIslandSupported,
@@ -223,6 +224,12 @@ function SidebarPinSpacer({ width }: { width: number }) {
 
 export function MainLayout() {
   const splitGroup = useSplitGroup();
+  // 发行 capability 投影(工作流 E):系统菜单 / 命令面板的 feedback、
+  // 更新检查、issue 入口在能力未部署时受控拒绝。ref 保最新值,命令回调
+  // 零依赖也能读到(蓝图 §3.6:UI 隐藏之外,命令入口同样不开口子)。
+  const distributionCapabilities = useAppCapabilities();
+  const distributionCapabilitiesRef = useRef(distributionCapabilities);
+  distributionCapabilitiesRef.current = distributionCapabilities;
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(getInitialCollapsed);
   const [shareImportRequest, setShareImportRequest] = useState<{
     id: number;
@@ -1042,6 +1049,8 @@ export function MainLayout() {
           }
           break;
         case 'check-for-updates':
+          // 更新服务未部署时受控忽略(菜单项已隐藏,这里兜底命令入口)。
+          if (distributionCapabilitiesRef.current.canCheckDesktopUpdates === false) break;
           void checkForUpdateWithToast(t);
           break;
         case 'open-release-notes':
@@ -1052,6 +1061,7 @@ export function MainLayout() {
           navigate('/settings?tab=help&openPanel=help');
           break;
         case 'open-issues':
+          if (distributionCapabilitiesRef.current.canUseFeedback === false) break;
           navigate('/issues');
           break;
         case 'new-maker':
@@ -1178,6 +1188,7 @@ export function MainLayout() {
           navigate('/skillhub/local');
           return true;
         case 'feedback':
+          if (distributionCapabilitiesRef.current.canUseFeedback === false) return true;
           navigate('/issues');
           return true;
         case 'openFolder':

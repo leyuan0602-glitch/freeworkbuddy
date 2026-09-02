@@ -29,6 +29,7 @@ import { CHROME_ACTIONS_GEOMETRY } from '@/components/layout/chromeActionsGeomet
 import { SidebarTopNav } from './SidebarTopNav';
 import { UpdateBanner } from './UpdateBanner';
 import { UserInfoSection } from './UserInfoSection';
+import { useAppCapabilities } from '@/hooks/useAppCapabilities';
 
 /** 折叠态 rail 宽度（px）——78px 与 ContentHeader 的红绿灯让位(pl-[78px])对齐:
  *  macOS 三个窗口控制点(traffic lights)整簇约 70px,rail 必须 ≥ 它才能完整容纳,
@@ -87,6 +88,10 @@ export function Sidebar({
   // 当前 Feature 是否自行渲染顶部导航的可滚动段(见 feature-context)。
   const ownsTopNavScrollableRows = useOwnsTopNavScrollableRows();
   const { t } = useTranslation();
+  // 更新横幅受发行 capability 闸控:updateMode=disabled / 未部署更新服务时
+  // (canCheckDesktopUpdates === false)整条不渲染,双保险叠加 updateMode 闸。
+  const distributionCapabilities = useAppCapabilities();
+  const showUpdateBanner = distributionCapabilities.canCheckDesktopUpdates !== false;
   // 顶部 chrome 行的 no-drag 洞要对齐 ChromeActions 浮层按钮簇的落点：
   // 按钮簇钉死左上角(mac 非全屏 78 让位红绿灯,其余 8),不随侧栏状态移动,
   // 洞跟随同一坐标(见 ChromeActions 的 x 计算)。
@@ -241,10 +246,12 @@ export function Sidebar({
           peek 抽屉视同展开(否则横幅在抽屉里消失,与「预览完整列表」语义相悖)。
           最小化入口互斥:展开态 busy 让路时本组件不渲染、头像行火焰涂黑;rail 时
           UserInfoSection 只回头像,折叠火焰就是那条提醒。 */}
-        <UpdateBanner
-          isCollapsed={(isCollapsed && !isPeek) || isRail}
-          onOpenVersionNotice={onOpenVersionNotice}
-        />
+        {showUpdateBanner && (
+          <UpdateBanner
+            isCollapsed={(isCollapsed && !isPeek) || isRail}
+            onOpenVersionNotice={onOpenVersionNotice}
+          />
+        )}
 
         {/* Bottom: User info (Shell-level, shared across all features)
           isCollapsed 在这里表达"窄布局"（rail 居中头像）；完全隐藏态 w-0 整体裁掉。 */}

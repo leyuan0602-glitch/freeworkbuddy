@@ -14,11 +14,17 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Tip } from '@/components/ui/tooltip';
+import { useAppCapabilities } from '@/hooks/useAppCapabilities';
 
 export function MenuButton({ onExitFullscreen }: { onExitFullscreen?: () => void }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
+  // 发行 capability 投影:feedback / 更新检查未部署时(=== false)对应菜单项
+  // 整体隐藏(main 侧 IPC 已受控拒绝,这里只做入口隐藏,蓝图 §3.6)。
+  const capabilities = useAppCapabilities();
+  const canUseFeedback = capabilities.canUseFeedback !== false;
+  const canCheckUpdates = capabilities.canCheckDesktopUpdates !== false;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -93,21 +99,25 @@ export function MenuButton({ onExitFullscreen }: { onExitFullscreen?: () => void
             全是动作短语(帮助 / 检查更新);夹一个英文名词既断了风格,也让不熟悉 GitHub
             的用户不知道该不该点。术语裁决(i18n/GLOSSARY.md)管的是指代那类对象的位置
             —— 页面标题与正文仍写 Issue,因为点进去就跳 GitHub,名字必须对得上。 */}
-        <DropdownMenuItem
-          className="focus:bg-titlebar-button-hover"
-          onSelect={() => {
-            log.info('Issues clicked');
-            navigate('/issues');
-          }}
-        >
-          {t('titleBar.menuItems.issues')}
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          className="focus:bg-titlebar-button-hover"
-          onSelect={() => { void checkForUpdateWithToast(t); }}
-        >
-          {t('titleBar.menuItems.checkForUpdates')}
-        </DropdownMenuItem>
+        {canUseFeedback && (
+          <DropdownMenuItem
+            className="focus:bg-titlebar-button-hover"
+            onSelect={() => {
+              log.info('Issues clicked');
+              navigate('/issues');
+            }}
+          >
+            {t('titleBar.menuItems.issues')}
+          </DropdownMenuItem>
+        )}
+        {canCheckUpdates && (
+          <DropdownMenuItem
+            className="focus:bg-titlebar-button-hover"
+            onSelect={() => { void checkForUpdateWithToast(t); }}
+          >
+            {t('titleBar.menuItems.checkForUpdates')}
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

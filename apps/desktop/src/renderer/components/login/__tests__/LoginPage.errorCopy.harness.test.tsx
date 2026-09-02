@@ -2,6 +2,8 @@
 
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { withAppCapabilities } from '../../../../test/vitest/appCapabilitiesTestBridge';
 import i18next from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
@@ -104,7 +106,7 @@ beforeAll(async () => {
 beforeEach(() => {
   Object.defineProperty(window, 'electronAPI', {
     configurable: true,
-    value: { platform: 'darwin' },
+    value: withAppCapabilities({ platform: 'darwin' }),
   });
 });
 

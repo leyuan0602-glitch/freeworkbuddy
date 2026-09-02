@@ -32,6 +32,7 @@ import {
   PluginManagementPage,
 } from '@/features/plugin/PluginManagementLayout';
 import { canAccessSkillhubMarket } from './lib/marketAccess';
+import { useAppCapabilities } from '@/hooks/useAppCapabilities';
 import { buildLocalSkillRoute, findLocalSkillByPath } from './lib/localRoutes';
 import { refresh as refreshSkillhub, useSkillhub } from './hooks/useSkillhub';
 import { useMarketList, type MarketSkill } from './hooks/useMarketList';
@@ -71,8 +72,11 @@ export function SkillhubHomeView({
 
   // 市场可见性门禁:仅 xd 组织的企业账号可见 Skill Hub 入口与推荐安装;
   // 其它账号(个人 / 非 xd 组织 / 未登录)只显示本地技能,且不发市场请求。
+  // 叠加发行 capability:skillhubApiBaseUrl 未部署时(canUseSkillHubCloud ===
+  // false)市场同样不可见 —— 蓝图 §2.5「空 endpoint 不留入口」。
   const { user } = useAuth();
-  const marketAllowed = canAccessSkillhubMarket(user);
+  const capabilities = useAppCapabilities();
+  const marketAllowed = canAccessSkillhubMarket(user, capabilities);
 
   // 推荐 = market trending 前 N(默认排序是 updated_at,挂载时切到 trending)。
   const {

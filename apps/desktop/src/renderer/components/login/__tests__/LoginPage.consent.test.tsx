@@ -3,6 +3,8 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { withAppCapabilities } from '../../../../test/vitest/appCapabilitiesTestBridge';
+
 import { CindyAuthClient, reduceAuthFlow, type AuthFlowState } from '@cindy/auth-client';
 import { createScenarioFetch } from '@cindy/auth-client/fixtures';
 
@@ -97,7 +99,7 @@ beforeEach(() => {
   acceptPrivacyConsent.mockClear();
   Object.defineProperty(window, 'electronAPI', {
     configurable: true,
-    value: { platform: 'darwin', openExternal, acceptPrivacyConsent },
+    value: withAppCapabilities({ platform: 'darwin', openExternal, acceptPrivacyConsent }),
   });
 });
 

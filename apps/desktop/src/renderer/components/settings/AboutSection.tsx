@@ -25,6 +25,7 @@ import { DefaultOverrideControls } from './DefaultOverrideControls';
 import { StorageManagementCard } from './StorageManagementCard';
 import { CURRENT_CINDY_REGION } from '../../../shared/brandRegion';
 import { LEGAL_LINKS } from '../../../shared/legalLinks';
+import { useAppCapabilities } from '@/hooks/useAppCapabilities';
 
 interface AgentVersionState {
   loading: boolean;
@@ -96,6 +97,12 @@ export function AboutSection() {
   const { t } = useTranslation();
   const claudeCode = useAgentBinaryVersion('claude-code');
   const codex = useAgentBinaryVersion('codex');
+  // 发行 capability 投影(工作流 E + 蓝图 §3.4):
+  // - canCheckDesktopUpdates === false → 自动更新开关整行隐藏(更新模式 disabled);
+  // - canOpenWebsite === false → 官方社区/外链卡隐藏(法律链接保留,离线可读)。
+  const capabilities = useAppCapabilities();
+  const showUpdateRow = capabilities.canCheckDesktopUpdates !== false;
+  const showSocialLinks = capabilities.canOpenWebsite !== false;
 
   return (
     <div className="flex flex-col gap-3">
@@ -126,8 +133,12 @@ export function AboutSection() {
             <Divider />
           </>
         )}
-        <AutoUpdateToggleRow />
-        <Divider />
+        {showUpdateRow && (
+          <>
+            <AutoUpdateToggleRow />
+            <Divider />
+          </>
+        )}
         <AnalyticsToggleRow />
         <Divider />
         <InfoRow
@@ -159,7 +170,7 @@ export function AboutSection() {
       </h3>
       <StorageManagementCard />
 
-      <SocialLinksPanel />
+      {showSocialLinks && <SocialLinksPanel />}
     </div>
   );
 }

@@ -3,6 +3,8 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { withAppCapabilities } from '../../test/vitest/appCapabilitiesTestBridge';
+
 const { betaChannelState, navigate } = vi.hoisted(() => ({
   betaChannelState: { enableBeta: false, isCustomized: false, loading: false },
   navigate: vi.fn(),
@@ -76,10 +78,10 @@ beforeEach(() => {
   betaChannelState.loading = false;
   Object.defineProperty(window, 'electronAPI', {
     configurable: true,
-    value: {
+    value: withAppCapabilities({
       appDisplayVersion: '1.0.0',
       appDisplayVersionDetail: '1.0.0-test',
-    },
+    }),
   });
 });
 

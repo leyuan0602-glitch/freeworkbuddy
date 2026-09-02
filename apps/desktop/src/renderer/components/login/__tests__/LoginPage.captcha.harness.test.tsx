@@ -3,6 +3,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { withAppCapabilities } from '../../../../test/vitest/appCapabilitiesTestBridge';
+
 import {
   CindyAuthClient,
   reduceAuthFlow,
@@ -127,11 +129,11 @@ async function emitCaptchaResult(fragment: string) {
 beforeEach(() => {
   Object.defineProperty(window, 'electronAPI', {
     configurable: true,
-    value: {
+    value: withAppCapabilities({
       platform: 'darwin',
       acceptPrivacyConsent: async () => ({ allowed: true }),
       authGetCaptchaChallengeUrl: async () => CHALLENGE_BASE,
-    },
+    }),
   });
 });
 

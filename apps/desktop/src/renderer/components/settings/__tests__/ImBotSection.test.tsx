@@ -2,6 +2,7 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { withAppCapabilities } from '../../../../test/vitest/appCapabilitiesTestBridge';
 import { ImBotSection } from '../ImBotSection';
 
 const authState = vi.hoisted(() => ({
@@ -49,6 +50,12 @@ describe('ImBotSection', () => {
   beforeEach(() => {
     authState.mode = 'cloud';
     authState.membershipKind = 'org';
+    // 官方发行默认 capability 全开:测试宿主无 Electron 桥时 useAppCapabilities
+    // fail closed 全 false,会把托管 hook 分栏隐藏。显式装桥对齐官方构建默认。
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: withAppCapabilities({}),
+    });
     scrollIntoView.mockReset();
     Object.defineProperty(Element.prototype, 'scrollIntoView', {
       configurable: true,

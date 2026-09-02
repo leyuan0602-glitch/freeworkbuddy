@@ -52,6 +52,7 @@ import { getLastWorkingDir, subscribeToLastWorkingDir } from '@/state/lastWorkin
 import { BillingSettingsSection } from '@/features/billing/BillingPage';
 import { canAccessBillingSettings } from './billingVisibility';
 import { canAccessUsageSettings } from './usageVisibility';
+import { useAppCapabilities } from '@/hooks/useAppCapabilities';
 import { UsageHistorySection } from './usage/UsageHistorySection';
 
 const DEFAULT_SETTINGS_MENU_WIDTH = 260;
@@ -75,14 +76,21 @@ export function SettingsView() {
     getLastWorkingDir,
   );
   const rawTab = searchParams.get('tab');
-  const canAccessBilling = canAccessBillingSettings({
-    mode,
-    membershipKind: user?.membershipKind ?? null,
-  });
+  // 发行 capability 快照(工作流 E):main 是真相源,这里只消费布尔投影。
+  const capabilities = useAppCapabilities();
+  const canAccessBilling = canAccessBillingSettings(
+    {
+      mode,
+      membershipKind: user?.membershipKind ?? null,
+    },
+    capabilities,
+  );
   const shouldRedirectLegacyPluginTabs = rawTab === 'api-keys' || rawTab === 'connections';
   // 用量历史对所有**已登录**身份开放 (local / cloud personal / cloud org),
   // 与 billing 的 canAccessBillingSettings 无关 —— #2785 维护者裁决。
-  const canAccessUsage = canAccessUsageSettings({ mode });
+  const canAccessUsage = canAccessUsageSettings({ mode }, capabilities);
+  // 远程控制依赖 device-link 服务;未部署时(canUseDeviceLink === false)整页隐藏。
+  const canAccessRemoteControl = capabilities.canUseDeviceLink !== false;
 
   const activeTab = useMemo<SettingsTab>(() => {
     const raw = rawTab;
@@ -94,9 +102,10 @@ export function SettingsView() {
     if (raw === 'tina') return 'im-bot';
     if (raw === 'billing' && !canAccessBilling) return 'general';
     if (raw === 'usage' && !canAccessUsage) return 'general';
+    if (raw === 'remote-control' && !canAccessRemoteControl) return 'general';
     if (raw === 'agent-island' && !isMac) return 'general';
     return isSettingsTab(raw) ? raw : 'general';
-  }, [canAccessBilling, canAccessUsage, isMac, rawTab]);
+  }, [canAccessBilling, canAccessUsage, canAccessRemoteControl, isMac, rawTab]);
   const piExtensionsPanelOpen =
     activeTab === 'general' &&
     (rawTab === 'pi-extensions' || searchParams.get('openPanel') === 'pi-extensions');
@@ -185,9 +194,10 @@ export function SettingsView() {
         (tabId) =>
           (isMac || tabId !== 'agent-island') &&
           (canAccessBilling || tabId !== 'billing') &&
-          (canAccessUsage || tabId !== 'usage'),
+          (canAccessUsage || tabId !== 'usage') &&
+          (canAccessRemoteControl || tabId !== 'remote-control'),
       ),
-    [canAccessBilling, canAccessUsage, isMac],
+    [canAccessBilling, canAccessUsage, canAccessRemoteControl, isMac],
   );
 
   // deep-link: ?section=... → scroll to a section inside the active tab.

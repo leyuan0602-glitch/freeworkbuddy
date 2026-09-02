@@ -21,6 +21,7 @@ import { CURRENT_CINDY_REGION } from '../../../shared/brandRegion';
 import { shouldLabelRegion } from '../../../shared/regionCode';
 import { MobileDownloadDialog } from './MobileDownloadDialog';
 import { AccountSwitcherDialog } from './AccountSwitcherDialog';
+import { useAppCapabilities } from '@/hooks/useAppCapabilities';
 
 interface UserInfoSectionProps {
   isCollapsed: boolean;
@@ -38,6 +39,12 @@ export function UserInfoSection({ isCollapsed, onOpenUpdateNotice }: UserInfoSec
   const mobileDownloadButtonRef = useRef<HTMLButtonElement>(null);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
   const { t } = useTranslation();
+  // 发行 capability 投影(工作流 E):设备互联 / 账号 / 更新检查未部署时,
+  // 对应入口隐藏(main 侧 IPC 已受控拒绝,蓝图 §3.6「两侧都要做」)。
+  const capabilities = useAppCapabilities();
+  const canUseDeviceLink = capabilities.canUseDeviceLink !== false;
+  const canUseAccount = capabilities.canUseAccount !== false;
+  const canCheckUpdates = capabilities.canCheckDesktopUpdates !== false;
 
   // 火焰按钮双职责:
   // - 正常情况(无 pending update 或 banner 未 dismiss)→ 弹更新历史 Dialog。
@@ -109,10 +116,12 @@ export function UserInfoSection({ isCollapsed, onOpenUpdateNotice }: UserInfoSec
           <Settings className="h-4 w-4" aria-hidden="true" />
           {t('sidebar.user.menuSettings')}
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => setAccountSwitcherOpen(true)} className="gap-2.5">
-          <UserPlus className="h-4 w-4" aria-hidden="true" />
-          {t('sidebar.user.menuAddAccount')}
-        </DropdownMenuItem>
+        {canUseAccount && (
+          <DropdownMenuItem onSelect={() => setAccountSwitcherOpen(true)} className="gap-2.5">
+            <UserPlus className="h-4 w-4" aria-hidden="true" />
+            {t('sidebar.user.menuAddAccount')}
+          </DropdownMenuItem>
+        )}
         {mode === 'cloud' ? (
           <>
             <DropdownMenuSeparator />
@@ -139,7 +148,8 @@ export function UserInfoSection({ isCollapsed, onOpenUpdateNotice }: UserInfoSec
     navigate('/settings?tab=remote-control&section=devices');
   };
 
-  const mobileDownloadEntry = (
+  // 手机下载入口依赖 device-link 服务部署;未发行(=== false)时不渲染。
+  const mobileDownloadEntry = canUseDeviceLink ? (
     <Tip text={t('sidebar.user.downloadMobile')} side="right">
       <button
         ref={mobileDownloadButtonRef}
@@ -158,7 +168,7 @@ export function UserInfoSection({ isCollapsed, onOpenUpdateNotice }: UserInfoSec
         <Smartphone className="h-3 w-3" aria-hidden="true" />
       </button>
     </Tip>
-  );
+  ) : null;
 
   if (isCollapsed) {
     return (
@@ -322,7 +332,7 @@ export function UserInfoSection({ isCollapsed, onOpenUpdateNotice }: UserInfoSec
           update 时切换为「唤回 banner」入口,视觉涂黑(fill 实心 + foreground 主色)
           告诉用户还有更新等待确认。rail 走上面的头像-only 分支,不会渲染这颗;
           busy 让路时折叠火焰才是最小化提醒,展开态才用这颗涂黑入口。 */}
-        {(onOpenUpdateNotice || isFlameReopen) && (
+        {(canCheckUpdates && (onOpenUpdateNotice || isFlameReopen)) && (
           <Tip
             text={
               isFlameReopen
