@@ -881,6 +881,7 @@ import {
 import { effectiveXdGatewayBaseUrl } from './model-access/effectiveEndpoint.js';
 import { isLocalDbOwnerCurrent } from './appSessionPolicy.js';
 import { getAppCapabilities, installCapabilitySnapshotBroadcaster, registerAppCapabilitiesIpc, requireAppCapability } from './appCapabilities.js';
+import { registerLegacyImportIpc } from './legacyImport/ipc.js';
 import { installNoEgressAudit, isNoEgressAuditRequested, scheduleNoEgressAuditQuit } from './noEgressAudit.js';
 import {
   activeOwnerScopeKey,
@@ -7987,6 +7988,8 @@ void app.whenReady().then(async () => {
   }
   registerClientEndpointsIpc();
   registerAppCapabilitiesIpc();
+  // 旧官方发行版数据显式导入(蓝图 §3.16):本地能力,不依赖端点与登录态。
+  registerLegacyImportIpc();
 
   // 网关凭据自动下发:订阅登录态(登录后向 model-access-server 拉 endpoint +
   // 用户专属 key)+ 注册 model-access:* IPC。须在 initClientEndpoints 之后

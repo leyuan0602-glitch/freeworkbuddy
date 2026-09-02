@@ -8,7 +8,7 @@
  *    旧库有而新库没有的列(历史遗留)直接丢弃;
  *  - 新库侧走**事务 + INSERT OR IGNORE**(同主键/唯一键跳过):导入幂等,
  *    重复执行不产生重复行,失败回滚不留半截数据(蓝图 §3.16 第 6 条);
- *  - 行数与体积预算:单库行数上限防内存/时间失控;
+ *  - 行数与体积预算:**先 COUNT 后取行**,超预算不加载、不写入;
  *  - 诊断只含计数与错误分类,**不含消息正文**(蓝图:诊断不含敏感正文)。
  *
  * 明确不导入(蓝图红线):token / 组织 session / model grant / hook binding /
@@ -18,7 +18,11 @@ import path from 'node:path';
 
 import type Database from 'better-sqlite3';
 
+import type { LegacyImportDbStats, LegacyImportTableStats } from '../../shared/legacyImport.js';
+
 import { createBetterSqliteDatabase } from '../localDb/betterSqliteFactory';
+
+export type { LegacyImportDbStats, LegacyImportTableStats } from '../../shared/legacyImport.js';
 
 export const LEGACY_IMPORT_MAX_ROWS_PER_TABLE = 200_000;
 
@@ -30,27 +34,6 @@ export const SESSION_COLUMNS = [
 export const MESSAGE_COLUMNS = [
   'id', 'client_id', 'session_id', 'role', 'content', 'created_at',
 ] as const;
-
-export interface LegacyTableImportStats {
-  rowsScanned: number;
-  rowsInserted: number;
-  rowsSkipped: number;
-  /** 旧库存在但新库完全没有的列(丢弃清单,进诊断)。 */
-  droppedLegacyColumns: string[];
-  /** 'budget-exceeded' 等;null = 正常。 */
-  errorKind: string | null;
-  /** 旧库无该表(更旧 schema),无行可导。 */
-  tableMissing: boolean;
-}
-
-export interface LegacyDbImportStats {
-  filePath: string;
-  sessions: LegacyTableImportStats;
-  messages: LegacyTableImportStats;
-  ok: boolean;
-  /** 失败分类(no-such-table / open-failed / budget-exceeded / txn-failed)。 */
-  errorKind: string | null;
-}
 
 /** 读取一张表的可用列 = 与 providedColumns 的交集(按 providedColumns 顺序)。 */
 export function intersectColumns(
@@ -72,6 +55,17 @@ function quotedList(columns: readonly string[]): string {
   return columns.map((c) => `"${c}"`).join(', ');
 }
 
+function emptyTableStats(): LegacyImportTableStats {
+  return {
+    rowsScanned: 0,
+    rowsInserted: 0,
+    rowsSkipped: 0,
+    droppedLegacyColumns: [],
+    errorKind: null,
+    tableMissing: false,
+  };
+}
+
 /**
  * 导入单张表:从 legacy db 只读选出交集列,事务内 OR IGNORE 写入 target。
  * 全部行在一个事务内(蓝图:失败回滚不留半截);行数超预算即中止并回滚整表。
@@ -82,15 +76,8 @@ function importTable(
   table: 'sessions' | 'messages',
   wantedColumns: readonly string[],
   maxRows: number,
-): LegacyTableImportStats {
-  const stats: LegacyTableImportStats = {
-    rowsScanned: 0,
-    rowsInserted: 0,
-    rowsSkipped: 0,
-    droppedLegacyColumns: [],
-    errorKind: null,
-    tableMissing: false,
-  };
+): LegacyImportTableStats {
+  const stats = emptyTableStats();
   const legacyColumns = tableColumns(legacyDb, table);
   if (legacyColumns.length === 0) {
     // 表不存在:不算失败(更旧的 schema),诊断标注。
@@ -101,11 +88,10 @@ function importTable(
   stats.droppedLegacyColumns = legacyColumns.filter((c) => !columns.includes(c));
   if (columns.length === 0) return stats;
 
-  const rows = legacyDb
-    .prepare(`SELECT ${quotedList(columns)} FROM "${table}" ORDER BY rowid ASC`)
-    .all() as Array<Record<string, unknown>>;
-  stats.rowsScanned = rows.length;
-  if (rows.length > maxRows) {
+  // 预算检查先于取行:超预算不把大表读进内存,也不产生任何写入。
+  const countRow = legacyDb.prepare(`SELECT COUNT(*) AS n FROM "${table}"`).get() as { n: number };
+  stats.rowsScanned = countRow.n;
+  if (countRow.n > maxRows) {
     stats.errorKind = 'budget-exceeded';
     return stats;
   }
@@ -113,6 +99,10 @@ function importTable(
   const targetColumns = tableColumns(targetDb, table);
   const insertable = columns.filter((c) => targetColumns.includes(c));
   if (insertable.length === 0) return stats;
+
+  const rows = legacyDb
+    .prepare(`SELECT ${quotedList(columns)} FROM "${table}" ORDER BY rowid ASC`)
+    .all() as Array<Record<string, unknown>>;
 
   const placeholders = insertable.map(() => '?').join(', ');
   const insert = targetDb.prepare(
@@ -132,16 +122,17 @@ function importTable(
 /**
  * 导入一份旧会话库。任何失败(打开/查询/事务)都以 ok:false + errorKind 返回,
  * **不抛异常**(调用方按库粒度聚合诊断;单库失败不影响其他库)。
+ * 任一表带 errorKind(如 budget-exceeded)同样记为 ok:false。
  */
 export function importLegacyDb(
   legacyDbPath: string,
   targetDb: Database.Database,
   options?: { maxRows?: number },
-): LegacyDbImportStats {
-  const result: LegacyDbImportStats = {
+): LegacyImportDbStats {
+  const result: LegacyImportDbStats = {
     filePath: legacyDbPath,
-    sessions: { rowsScanned: 0, rowsInserted: 0, rowsSkipped: 0, droppedLegacyColumns: [], errorKind: null, tableMissing: false },
-    messages: { rowsScanned: 0, rowsInserted: 0, rowsSkipped: 0, droppedLegacyColumns: [], errorKind: null, tableMissing: false },
+    sessions: emptyTableStats(),
+    messages: emptyTableStats(),
     ok: false,
     errorKind: null,
   };
@@ -155,7 +146,11 @@ export function importLegacyDb(
     const maxRows = options?.maxRows ?? LEGACY_IMPORT_MAX_ROWS_PER_TABLE;
     result.sessions = importTable(legacyDb, targetDb, 'sessions', SESSION_COLUMNS, maxRows);
     result.messages = importTable(legacyDb, targetDb, 'messages', MESSAGE_COLUMNS, maxRows);
-    result.ok = true;
+    // 表级 errorKind(如 budget-exceeded)汇总为库级失败,调用方在 UI 里可见。
+    result.ok = result.sessions.errorKind === null && result.messages.errorKind === null;
+    if (!result.ok) {
+      result.errorKind = result.sessions.errorKind ?? result.messages.errorKind;
+    }
     return result;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

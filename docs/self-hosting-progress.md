@@ -26,20 +26,29 @@
 
 ## 二、当前 WIP（必须先读完再动代码）
 
-**数据 import adapter（蓝图 §3.16，第 11 项核心）——已写代码、未完成**，工作树里有未提交文件：
+**数据 import adapter（蓝图 §3.16，第 11 项核心）——代码、单测、UI 已完成，未 commit**，工作树里有未提交文件：
 
 ```
 apps/desktop/src/main/legacyImport/
 ├── discover.ts       # 旧官方 userData 只读发现（symlink 拒绝/路径边界/体积上限/mtime 防伪）
 ├── importAdapter.ts  # schema 桥接导入（PRAGMA 交集列、事务 + INSERT OR IGNORE 幂等、readonly 打开旧库）
-└── ipc.ts            # legacy-import:discover / :execute 两个 channel
+└── ipc.ts            # legacy-import:discover / :execute 两个 channel（sender 闸 + payload 校验）
+apps/desktop/src/shared/legacyImport.ts                                  # 跨进程协议类型与 channel 常量
+apps/desktop/src/renderer/components/settings/LegacyImportSection.tsx    # 设置页导入入口卡片
+apps/desktop/src/main/__tests__/legacyImport{Adapter,Discover,Ipc}.test.ts
 ```
 
+**已完成（2026-09-01 接手轮）**：
+1. 单测 ✅：`src/main/__tests__/legacyImport{Adapter,Discover,Ipc}.test.ts`（27 例：交集列导入、幂等、表缺失、超预算不写入、readonly 承诺、corrupt-db、symlink/体积/未来 mtime 拒绝、IPC sender 闸与 path-not-from-discovery）。
+2. IPC 注册 ✅：`registerLegacyImportIpc()` 已在 bootstrap-electron `registerAppCapabilitiesIpc()` 之后注册；顺带修复 ipc.ts 缺失的 `import path`（原 WIP 用了 `path.sep` 未导入）。
+3. 设置页入口 ✅：`renderer/components/settings/LegacyImportSection.tsx`（扫描 → 勾选 → 导入 → 结果展示），挂在 Settings「导入」页顶部；preload 暴露 `electronAPI.legacyImport.{discover,execute}`，协议类型收敛在 `src/shared/legacyImport.ts`。
+4. 加固（Electron 进程边界规则 §5）：两个 handler 都过 `assertTrustedAppRendererEvent`；execute 校验条目数（≤8）与路径长度；ok 语义修正（任一表 errorKind → 库级 ok:false）；超预算改为先 COUNT 后取行（不加载大表）。
+5. i18n ✅：5 locale 均有 `settings.legacyImport.*`；`pnpm check:i18n-glossary` 通过（「会话数据库」改「任务数据库」避让 Session 禁用译法）；design inventory 已重新生成。
+
 **未完成的事项（接手者按序做）**：
-1. importAdapter 的 better-sqlite3 是通过 `createBetterSqliteDatabase`（localDb 工厂）打开的，`npm test` 未验证 —— 需要单测（fixture：手工建最小旧库 sqlite + 新库 sqlite，验证交集列导入、幂等（跑两遍行数不变）、表缺失、超预算回滚、symlink/体积拒绝）。
-2. `registerLegacyImportIpc()` 尚未在 bootstrap-electron 注册（应放在 `registerAppCapabilitiesIpc()` 之后）。
-3. 设置页入口卡片未做（发现列表 → 勾选 → 执行 → 结果展示；文案遵循「显式 import、失败保留旧数据」）。
-4. 交接红线（蓝图 §3.16）：不导入 token/组织 session/model grant/hook binding/push registration；BYOK 重新录入；诊断不含消息正文；失败保留旧数据。
+1. 提交与 PR：以上改动尚未 commit（等用户决定进 PR #2 分支还是另开）。commit 一律 `git commit -s`。
+2. 三平台 packaged 实机 UAT（含设置页入口的真实导入演练）。
+3. 交接红线（蓝图 §3.16）：不导入 token/组织 session/model grant/hook binding/push registration；BYOK 重新录入；诊断不含消息正文；失败保留旧数据。（代码已按红线实现并有用例锁定）
 
 ## 三、关键技术决策（已定，勿推翻）
 
@@ -79,6 +88,14 @@ CINDY_DISTRIBUTION_PROFILE=freeworkbuddy-selfhost NODE_OPTIONS='--max-old-space-
 node scripts/no-egress-smoke.mjs --platform=darwin --arch=arm64
 ```
 
+⚠️ 本机 node 版本坑（2026-09-01 实测）：本机的 `node_modules/better-sqlite3`
+native binding 是按 node 24（NODE_MODULE_VERSION 137）编译的，而默认 PATH 里的
+node 是 22（ABI 127）——任何加载 better-sqlite3 的单测（含 legacy import 全部
+用例）在 node 22 下会直接 ABI 报错。跑 vitest 前先把 node 24 的 shim 目录放进
+PATH：`PATH="/Users/yuan/.local/state/fnm_multishells/84059_1788176933773/bin:$PATH"`。
+另外 `fs.utimesSync` 传数字时单位是**秒**不是毫秒（传 `Date.now()` 会把 mtime
+顶到文件系统钳制的哨兵值），测试里要传 `Date` 对象。
+
 ## 七、分支与 PR 约定
 
 - 全部工作经 PR 进 main（`gh pr create --repo leyuan0602-glitch/freeworkbuddy`）。
@@ -93,7 +110,7 @@ node scripts/no-egress-smoke.mjs --platform=darwin --arch=arm64
 
 ## 八、剩余工作清单（按优先级）
 
-1. **完成 import adapter**（本 WIP：测试 → 注册 IPC → 设置页卡片）——第 11 项核心。
+1. **import adapter 收口提交**（代码+单测+UI 已完成，见第二节；等 commit/PR 决策）——第 11 项核心。
 2. **UI 入口逐域隐藏**：按 `useAppCapabilities`（`=== false`）迁移 Settings 各卡片；已知 SkillHub market 有组织门禁天然 fail-closed；updater banner 由 updateMode 闸天然关闭。
 3. **legal/support/社区链接默认值清理**（legalLinks 已 profile 化；About/Help 的官网/下载链接待接 `CURRENT_DISTRIBUTION_BRAND.websiteUrl`，空则隐藏）。
 4. **三平台 packaged UAT**（Windows/Linux 需对应环境或 CI runner——Actions 额度未恢复前需外部方案）。

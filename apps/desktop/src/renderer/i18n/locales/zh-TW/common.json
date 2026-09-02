@@ -1241,6 +1241,31 @@
         }
       }
     },
+    "legacyImport": {
+      "title": "從舊版官方應用匯入",
+      "description": "唯讀掃描本機舊版官方應用（Cindy）的資料目錄。只有勾選的資料庫會被匯入；掃描與匯入都不會修改或刪除舊資料，失敗時舊資料保持原樣。",
+      "scan": "掃描舊版資料",
+      "scanning": "掃描中",
+      "empty": "未發現舊版資料",
+      "emptyHint": "沒有在本機找到舊版官方應用的任務資料庫。如果舊版應用在其他系統使用者帳戶下使用過，請切換到對應帳戶後再掃描。",
+      "userDb": "使用者 {{userId}} 的任務資料庫",
+      "warnings": "另有 {{count}} 個檔案被跳過（懸停查看原因）",
+      "credentialsNote": "登入憑證與模型 API 金鑰不會被匯入，匯入後需要重新登入並錄入自己的模型金鑰。",
+      "importSelected": "匯入選中（{{count}}）",
+      "importing": "匯入中",
+      "resultOk": "已匯入 {{sessions}} 條任務、{{messages}} 條訊息，跳過 {{skipped}} 條已存在內容",
+      "resultFailed": "匯入失敗（{{kind}}），該庫未寫入任何內容，舊資料保持原樣",
+      "droppedColumns": "忽略 {{count}} 個舊版欄位",
+      "messagesTableMissing": "舊庫沒有訊息資料",
+      "resultFooter": "匯入為冪等操作：重複執行同一庫不會產生重複內容。",
+      "kind": {
+        "corrupt-db": "檔案損壞或不是有效資料庫",
+        "no-such-table": "資料表結構不相容",
+        "txn-failed": "寫入失敗",
+        "budget-exceeded": "資料量超出單次匯入上限",
+        "rejected": "路徑不在允許範圍內"
+      }
+    },
     "sessionImport": {
       "title": "本地任務匯入",
       "description": "只讀掃描本機 Claude Code 與 Codex 歷史。只有列表裡勾選的任務會被匯入；已跳過的內部 Agent 會話不會展示，也不會匯入。",

@@ -19,6 +19,16 @@ import path from 'node:path';
 
 import type { CindyRegion } from '@cindy/maker-shared/brand-identity';
 
+import type {
+  LegacyImportDiscoveryResult,
+  LegacyImportDiscoveredDb,
+} from '../../shared/legacyImport.js';
+
+export type {
+  LegacyImportDiscoveryResult,
+  LegacyImportDiscoveredDb,
+} from '../../shared/legacyImport.js';
+
 /** 官方发行版的 userData 目录名(brandIdentity.userDataDirNameByRegion 镜像,镜像测试锁定)。 */
 export const LEGACY_USER_DATA_DIR_NAMES: Readonly<Record<CindyRegion, string>> = Object.freeze({
   cn: 'Cindy',
@@ -31,28 +41,6 @@ export const LEGACY_DB_FILE_PREFIX = 'cindy';
 
 /** 旧库单文件体积上限(512MB):正常会话库远小于此,超出按损坏/误选拒收。 */
 export const LEGACY_DB_MAX_BYTES = 512 * 1024 * 1024;
-
-export interface DiscoveredLegacyDb {
-  /** 所属官方 region 目录(cn/global/dev)。 */
-  region: CindyRegion;
-  /** 绝对路径(已验证为候选目录内 regular file)。 */
-  filePath: string;
-  /** 文件体积字节。 */
-  sizeBytes: number;
-  /** 从文件名解析的 userId(`<prefix>-<userId>.db`)。 */
-  userId: string;
-}
-
-export interface LegacyDiscoveryResult {
-  /** appData 根(调用方用于展示发现来源)。 */
-  appDataDir: string;
-  /** 已检查的候选目录(存在与否)。 */
-  checkedDirs: Array<{ dir: string; exists: boolean }>;
-  /** 发现的旧会话库(每目录最多一条最新 mtime)。 */
-  databases: DiscoveredLegacyDb[];
-  /** 发现阶段的非致命问题(拒绝原因),不含用户内容。 */
-  warnings: string[];
-}
 
 function isRegularNonSymlinkFile(filePath: string): boolean {
   try {
@@ -77,7 +65,7 @@ export function pickLatestLegacyDbFromNames(
   dir: string,
   fileNames: readonly string[],
   now: number,
-): { db: DiscoveredLegacyDb | null; warnings: string[] } {
+): { db: LegacyImportDiscoveredDb | null; warnings: string[] } {
   const warnings: string[] = [];
   const candidates: Array<{ filePath: string; mtimeMs: number; sizeBytes: number; userId: string }> = [];
   for (const name of fileNames) {
@@ -130,8 +118,8 @@ export function pickLatestLegacyDbFromNames(
 /**
  * 发现旧官方发行版的会话数据库。零写入(蓝图 §3.16:导入成功前旧数据原样保留)。
  */
-export function discoverLegacyDatabases(appDataDir: string, now = Date.now()): LegacyDiscoveryResult {
-  const result: LegacyDiscoveryResult = {
+export function discoverLegacyDatabases(appDataDir: string, now = Date.now()): LegacyImportDiscoveryResult {
+  const result: LegacyImportDiscoveryResult = {
     appDataDir,
     checkedDirs: [],
     databases: [],

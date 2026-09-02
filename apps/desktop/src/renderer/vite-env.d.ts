@@ -4254,6 +4254,14 @@ interface ElectronAPI {
     confirm: () => Promise<void>;
   };
 
+  // ── 旧官方发行版数据显式导入(蓝图 §3.16)──
+  legacyImport: {
+    discover: () => Promise<import('../shared/legacyImport').LegacyImportDiscoveryResult>;
+    execute: (
+      filePaths: readonly string[],
+    ) => Promise<import('../shared/legacyImport').LegacyImportExecuteResult>;
+  };
+
   // ── chat-data-localization (M-FE2) — local SQLite IPC bridge ──
   localDb: {
     /** Open / migrate the per-user db file. Failure → fatal dialog + ready:false. */

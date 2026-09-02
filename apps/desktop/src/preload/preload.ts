@@ -1039,6 +1039,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('local-themes:import') as Promise<LocalThemeImportResult>,
   },
 
+  // 旧官方发行版数据显式导入(蓝图 §3.16):固定方法、无任意 channel;
+  // 路径授权在 main 侧重新校验(必须来自 discover 结果或候选目录形态)。
+  legacyImport: {
+    discover: (): Promise<import('../shared/legacyImport').LegacyImportDiscoveryResult> =>
+      ipcRenderer.invoke('legacy-import:discover'),
+    execute: (
+      filePaths: readonly string[],
+    ): Promise<import('../shared/legacyImport').LegacyImportExecuteResult> =>
+      ipcRenderer.invoke('legacy-import:execute', { filePaths } satisfies import('../shared/legacyImport').LegacyImportExecuteInput),
+  },
+
   // RSB terminal tab(PTY 后端 + xterm.js)
   // - create / write / resize / dispose / restart: 单 PTY 生命周期管理
   // - listAvailableShells / get|setDefaultShellPref: Settings 个性化下拉用

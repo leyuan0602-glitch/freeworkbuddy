@@ -37,6 +37,7 @@ import { TipsSection } from './TipsSection';
 import { ExperimentalSection } from './ExperimentalSection';
 import { GitSafetySection } from './GitSafetySection';
 import { SessionImportSection } from './SessionImportSection';
+import { LegacyImportSection } from './LegacyImportSection';
 import { HelpSection } from './HelpSection';
 import { HelpAssistantPanel } from './HelpAssistantPanel';
 import { AgentResourceSection } from './AgentResourceSection';
@@ -584,9 +585,13 @@ export function SettingsView() {
                 role="tabpanel"
                 id="settings-panel-import"
                 aria-labelledby="settings-tab-import"
-                className="h-full min-h-0"
+                className="flex h-full min-h-0 flex-col gap-[18px]"
               >
-                <section className="h-full min-h-0" aria-label={t('settings.sections.import')}>
+                {/* 旧官方发行版数据显式导入:紧凑卡片,固定在上;下方为本地任务导入主区。 */}
+                <section className="shrink-0" aria-label={t('settings.legacyImport.title')}>
+                  <LegacyImportSection />
+                </section>
+                <section className="flex min-h-0 flex-1 flex-col" aria-label={t('settings.sections.import')}>
                   <SessionImportSection />
                 </section>
               </div>
