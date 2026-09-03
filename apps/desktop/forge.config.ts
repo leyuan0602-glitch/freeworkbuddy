@@ -13,6 +13,7 @@ import { VitePlugin } from '@electron-forge/plugin-vite';
 import type { ForgeArch, ForgeConfig, ForgePlatform } from '@electron-forge/shared-types';
 import {
   allDeepLinkSchemes,
+  BRAND_IDENTITY,
   resolveCindyRegion,
   type BrandIdentity,
 } from '@cindy/maker-shared/brand-identity';
