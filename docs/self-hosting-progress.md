@@ -13,14 +13,14 @@
 | 2 | Contract registry + 域名台账 + CI guard | ✅ 已合并 | PR #1 `0596c3c5` |
 | 3 | DistributionProfile schema + 官方回归 | ✅ 已合并 | PR #1 `f46b913a` |
 | 4 | 独立品牌 + Desktop identity（构建链） | ✅ 已合并 | PR #1 `a95eebba` |
-| 5 | Mobile identity | ✅ 已合并（fingerprint 实测不变，冷更确认记录在 commit） | PR #1 `aecf89b6` |
+| 5 | Mobile identity | ✅ 基础身份已合并；PR #2 补齐原生产品名、构建入口与登录品牌。FreeWorkBuddy 使用独立 runtime fingerprint，内部测试包需冷更重装 | PR #1 `aecf89b6` + PR #2 |
 | 6 | embedded/remote bootstrap + self-host 信任根 + 单 realm | ✅ 已合并；FreeWorkBuddy 当前从 `https://freeworkbuddy.me/endpoint.json` remote bootstrap | PR #1 `6a372a14` + 本轮收口 |
 | 7 | 单 realm auth routing | ✅ 核心并入 #6；issuer/realm 原子绑定随 Phase 2 server | — |
 | 8 | Capability snapshot 管道（main→preload→renderer） | ✅ 已合并 | PR #1 `2135dbcf` |
 | 9 | 逐域迁移 gate | ✅ main 边界半边已合并 `fc4c7ad9`；变化推送/hook/updater 闸在 PR #2 `222d1c96d`；UI 入口逐域隐藏 ✅ `867304a91`（登录/设置/标题栏/侧栏/SkillHub/插件市场） | PR #1 + PR #2 |
 | 10 | 去官方默认值 | ✅ 主体收口：no-egress 验收 `8a997c2b`；TapDB 发行闸 `2d523dd2`；legalLinks profile 化；About 页更新开关/社媒面板已按 capability 隐藏 `867304a91`（LEGAL_LINKS 按法规要求保留） | PR #1 + PR #2 |
-| 11 | Local-first 收口 | ◐ packaged/断网/no-egress macOS 已实测；import adapter 已补 renderer grant、文件指纹复验与整库原子事务；**Windows/Linux packaged UAT 未做** | PR #2 |
-| 12–16 | 服务端仓 + Phase 2 MVP | ◐ Auth、operator login、device registry、relay、media presign、单机 Compose 与静态 manifest 已实现；86 例服务端测试及 typecheck/build/lint/guard 通过；**真实 Compose、迁移/备份恢复、Mobile 双设备 UAT 未做** | 独立仓 |
+| 11 | Local-first 收口 | ◐ packaged/schema/no-egress macOS 已实测；import adapter 已补 renderer grant、文件指纹复验与整库原子事务；**Windows/Linux packaged UAT 未做** | PR #2 |
+| 12–16 | 服务端仓 + Phase 2 MVP | ✅ Auth、operator login、device registry、relay、OSS presign、单机 Compose、迁移、TLS 与静态 manifest 已部署；87 例服务端测试及 typecheck/build/lint/guard 通过；生产协议 smoke 与备份恢复已通过 | 独立仓 `freeworkbuddy-server` |
 | 17–20 | Phase 3 可选云能力 | ⏸ 按蓝图留接口，不进首发关键路径；对应 endpoint 保持空串且客户端 capability 关闭 | 独立仓 + 客户端 |
 
 已合并 main 的 commit：`92c234679`（merge PR #1）。PR #2（capability 推送/hook/updater 闸）**未合并**。
@@ -65,9 +65,9 @@
    并广播 relay 踢线；发布失败保留 registry 行供幂等补偿重试，旧 access/refresh token 均不可重连。
 7. **单机部署清单**：Caddy 统一承载 TLS、静态 manifest/法律页、API 与 WebSocket 反代；PostgreSQL、
    Redis、API、relay 不暴露宿主端口；JWT 私钥仅挂给 API，OSS 使用阿里云外部 endpoint。
-8. **验证**：服务端 `typecheck/test/build/lint/guard` 全绿（11 files / 86 tests），Compose config
-   可展开，生产 endpoint.json 已通过客户端 parser。Docker daemon 当前未运行，因此镜像构建、
-   真实 migration 与 backup/restore smoke 尚无证据。
+8. **验证**：服务端 `typecheck/test/build/lint/guard` 全绿（11 files / 87 tests）；生产 Compose
+   镜像、四次 migration、TLS、登录/refresh/logout、relay 撤销、OSS 与 backup/restore smoke
+   均已有真实环境证据。
 
 ## 二点五、2026-09-02 本地全链路联调（已验证可用）
 
@@ -92,6 +92,36 @@
    （服务端四件套重启：api/relay 各自 dev script + `node deploy/local/gateway.mjs`；依赖本机 postgres/redis/minio 先在跑。）
 7. **边界**：UI 内完成一次真实登录（取码填码到登录成功）尚未由用户实机走完；S3 media 路由 UI 侧验证未做；Docker Desktop 需人工修复/升级。
 
+## 二点六、2026-09-03 生产上线与内部包
+
+1. **生产入口**：`https://freeworkbuddy.me`，香港轻量应用服务器公网 IP
+   `47.82.73.32`；Ubuntu 24.04、Docker 29.1.3、Compose 2.40.3。部署目录为
+   `/opt/freeworkbuddy/current`，PostgreSQL、Redis、API、Relay、Caddy 均为 healthy，只有
+   Caddy 暴露 80/443。1 GB 主机已配置 2 GB swap，根盘当前约 29%。
+2. **生产端点**：`/readyz`、`/endpoint.json`、`/.well-known/jwks.json`、`/privacy`、
+   `/terms` 均通过 HTTPS；证书由 Let's Encrypt 签发。manifest 只启用 account、
+   device-link 与 website，未实现的 OAuth、hooks、voice、SkillHub、plugin、update 等地址
+   保持空串，客户端入口按 capability 隐藏。
+3. **生产协议验收**：operator 邮箱验证码登录、refresh、logout、服务重启后的 refresh
+   持久化、未认证 WebSocket 401、Relay 连接/重连、设备移除后的 `4403` 踢线与 session
+   撤销、OSS presign PUT/GET/delete 均通过。PostgreSQL dump/restore smoke 确认 13 张表、
+   4 条 migration。
+4. **首个内部账号**：邮箱 `owner@freeworkbuddy.me`；6 位登录码只保存在开发机
+   `~/.freeworkbuddy/initial-login.txt`，不进入仓库、聊天或普通日志。
+5. **macOS arm64 内部包**：
+   `~/.freeworkbuddy/artifacts/FreeWorkBuddy-macos-arm64-internal.zip`，ad-hoc 深度签名通过
+   `codesign --verify --deep --strict`，bundle id 为 `me.freeworkbuddy.desktop`；packaged
+   schema smoke 通过（schema 99），no-official-egress smoke 观察到 0 个外连域。
+   SHA-256：`a22e5e05f9f64dff512bbf9f2a8aee0ad3a347b2d9e09441055dd13faae61d45`。
+6. **Android 内部包**：`~/.freeworkbuddy/artifacts/app-release.apk`，package
+   `me.freeworkbuddy.android`、version `0.1.0 (10)`、runtimeVersion
+   `33f61150c21966d4b5d5c1b542c6b69868de97e7`；APK v2 签名校验、Pixel 7 API 36 安装启动和
+   登录页品牌目检通过，页面显示 FreeWorkBuddy 且不再残留 Cindy 登录字标。SHA-256：
+   `da3bf10e68a77c70a2011cedbcdc9c0b328e312e178addcf9483db24fee3a944`。
+7. **iOS**：bundle id 与构建链已投影为 `me.freeworkbuddy.ios`，但没有 Apple Developer
+   distribution certificate / provisioning profile，不能产出可安装 IPA；这是当前唯一明确的
+   移动端发布阻塞。
+
 ## 三、关键技术决策（已定，勿推翻）
 
 1. **发行维度**：`CINDY_DISTRIBUTION_PROFILE` env（缺省=官方路径逐字节不变；`freeworkbuddy-selfhost` = FreeWorkBuddy）。单一选取入口 `resolveDistributionProfile`（maker-shared `./distribution-profile`）。
@@ -115,7 +145,9 @@
    vitest threads worker），去掉 setupFiles、改 per-test 显式注入后稳定；forks 池
    不受影响。勿再往 `vitest.config.ts` 加 setupFiles。
 3. `pnpm check:dco` 在从 main 切出的分支上会误报（对比 upstream/main 老 merge-base 把全仓历史算进去）；以 PR 的 DCO App 为准。
-4. no-egress audit 的 `app.exit(0)` 在长启动链下可能不立即收敛（脚本有 SIGKILL 兜底 + 报告已落盘，验收功能完整）；优雅退出链是独立遗留问题。
+4. no-egress audit 的 `app.exit(0)` 在完整启动链下可能不立即收敛；验收脚本现仅在原子报告
+   已落盘后等待 2 秒并回收残留 Electron 进程，普通超时或异常退出会正确失败。应用自身的
+   优雅退出链仍是独立遗留问题。
 5. **GitHub Actions 额度耗尽**：`client-ci`、`pr-code-review` 两个 workflow 已通过 API 禁用（fork 仓设置），`pr-design-basis` 保留。所有门禁改为本地跑（见下）。恢复 CI 需 owner 配置 secrets 或换自托管 runner。
 
 ## 六、本地验证命令（替代 CI 的等价门禁）
@@ -157,11 +189,14 @@ PATH：`PATH="/Users/yuan/.local/state/fnm_multishells/84059_1788176933773/bin:$
 
 ## 八、剩余工作清单（需要外部环境或后续产品决策）
 
-1. **push 与 PR**：本轮提交完成后仍需由用户明确决定 push 时机；客户端进入现有 PR #2，
-   服务端首次 push 到独立 private 仓。
-2. **三平台 packaged UAT**（Windows/Linux 需对应环境或 CI runner——Actions 额度未恢复前需外部方案）：含设置页 legacy import 真实导入演练、UI 入口隐藏的 self-host 构建目检。
-3. **Mobile 侧完整 capability projection**：首期账号/device-link 已可从 endpoint manifest 取值；
-   尚需在启用 Phase 3 功能前把 voice、OAuth、push、更新等 UI/后台任务统一接入同构 capability。
-4. **服务端 Phase 2 环境验收**：Docker 可用后执行真实 PostgreSQL migration、Compose build、
-   backup/restore smoke；DNS/TLS/OSS 配置完成后跑 Desktop + iOS + Android 双设备 UAT。
-5. **Phase 3 可选云能力**（§3.19 17-20）：蓝图明确「按需、不进关键路径」，接口已留，暂不实现。
+1. **客户端 PR #2**：本轮收口提交需推到现有 PR，并更新描述。Mobile 新品牌身份会改变
+   runtime fingerprint，属于必要冷更；合并前仍须仓库指定把关人针对冷更明确确认。
+2. **iOS 内部包**：等待 Apple Developer distribution certificate、provisioning profile 与
+   Team ID 后执行真实 archive/export/install smoke。
+3. **跨平台 UAT**：Windows/Linux packaged UAT 需要对应机器或自托管 runner；当前 GitHub
+   Actions 额度不可用，macOS arm64 与 Android 已覆盖。
+4. **真实双端 UI 演练**：生产 API/Relay 已完成协议级登录、重连、撤销验收；仍建议由内部用户
+   在 Desktop + Android UI 各登录一次，并完成一轮真实任务控制和媒体附件交接。
+5. **Phase 3 可选云能力**（§3.19 17-20）：按需实现 OAuth、hooks、voice、SkillHub、plugin、
+   push 与 update；启用前必须同时补服务端实现、manifest endpoint 与客户端 capability，禁止
+   只填地址或只放开 UI。

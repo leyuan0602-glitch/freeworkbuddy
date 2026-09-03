@@ -303,6 +303,9 @@ module.exports = (context = {}) => {
   const easProjectId = process.env.EAS_PROJECT_ID?.trim();
   let next = {
     ...baseConfig,
+    ...(distribution.kind === 'selfhost'
+      ? { name: distribution.identity.productName }
+      : {}),
     ...(easOwner ? { owner: easOwner } : {}),
     scheme: regional.scheme,
     ios: {

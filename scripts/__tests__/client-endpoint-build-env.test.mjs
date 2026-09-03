@@ -152,6 +152,49 @@ test('iOS 构建在子进程启动前失败时输出安全且可执行的诊断'
   assert.doesNotMatch(result.stderr, /详细原因请查看上方构建工具输出/);
 });
 
+test('FreeWorkBuddy Mobile dry-run 使用独立身份和单 realm 自举地址', () => {
+  const regionFile = path.resolve(
+    'apps/mobile/scripts/self-host-regions.json.example',
+  );
+  const expectedByScript = new Map([
+    ['build-android.mjs', 'me.freeworkbuddy.android'],
+    ['build-ios.mjs', 'me.freeworkbuddy.ios'],
+  ]);
+
+  for (const [script, expectedIdentity] of expectedByScript) {
+    const result = spawnSync(
+      process.execPath,
+      [path.resolve('apps/mobile/scripts', script), '--region', 'global'],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          CINDY_DISTRIBUTION_PROFILE: 'freeworkbuddy-selfhost',
+          CINDY_SELF_HOST_REGIONS_FILE: regionFile,
+        },
+      },
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, new RegExp(`target: .*${expectedIdentity}`));
+    assert.match(
+      result.stdout,
+      /EXPO_PUBLIC_ENDPOINT_MANIFEST_BASE_URL=https:\/\/freeworkbuddy\.me/,
+    );
+    assert.match(
+      result.stdout,
+      /EXPO_PUBLIC_ENDPOINT_MANIFEST_PEER_BASE_URL=\n/,
+    );
+  }
+
+  const iosSource = fs.readFileSync(
+    path.resolve('apps/mobile/scripts/build-ios.mjs'),
+    'utf8',
+  );
+  assert.match(iosSource, /buildIpa\(env, region, iosBundleId\)/);
+  assert.match(iosSource, /bundleId: iosBundleId/);
+});
+
 test('端点清单自举基址缺失、非法协议或携带凭据时 fail closed', () => {
   const repoRoot = writeRepoFixtures();
   const cnPath = path.join(repoRoot, 'config', 'endpoint.json');

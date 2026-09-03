@@ -208,6 +208,11 @@ test('mobile distribution-profile.cjs 镜像与 maker-shared 单点逐字段一�
     '独立发行 scheme 两侧不一致',
   );
   assert.ok(
+    mobileMirror.includes("productName: 'FreeWorkBuddy'")
+      && profileSource.includes("productName: 'FreeWorkBuddy'"),
+    '独立发行 Mobile 产品名与 maker-shared 单点不一致',
+  );
+  assert.ok(
     mobileMirror.includes("endpointManifestBaseUrl: 'https://freeworkbuddy.me'")
       && profileSource.includes("bootstrapUrl: 'https://freeworkbuddy.me/endpoint.json'"),
     '独立发行 Mobile manifest bootstrap 与 maker-shared 单点不一致',

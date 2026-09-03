@@ -1,6 +1,7 @@
 import { getLocales } from "expo-localization";
 
 import { getManualLocaleOverride } from "@/i18n/appLanguage";
+import { localizeMobileBrand } from "@/config/mobileBrand";
 
 /**
  * 登录域多语文案 catalog(zh-CN/zh-TW/en/ja/ko)。
@@ -676,7 +677,7 @@ export function getAuthLocale(): "zh-CN" | "en" {
 }
 
 export function loginText(key: LoginMessageKey): string {
-  return loginMessages[getLoginLanguage()][key];
+  return localizeMobileBrand(loginMessages[getLoginLanguage()][key]);
 }
 
 /** 登录错误码 → 多语文案(与 catalog 同一 locale 解析;导出供 parity/闸门测试)。 */
@@ -840,5 +841,7 @@ export const authErrorMessages: Record<string, Record<LoginLocale, string>> = {
 export function authErrorText(code: string | null): string | null {
   if (!code) return null;
   const localized = authErrorMessages[code];
-  return localized?.[getLoginLanguage()] ?? loginText("errorFallback");
+  return localized
+    ? localizeMobileBrand(localized[getLoginLanguage()])
+    : loginText("errorFallback");
 }

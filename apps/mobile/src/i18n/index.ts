@@ -12,7 +12,6 @@
 
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
-import { BRAND_NAME } from "@cindy/maker-shared/branding";
 
 import enCommon from "./locales/en";
 import zhCNCommon from "./locales/zh-CN";
@@ -21,6 +20,10 @@ import jaCommon from "./locales/ja";
 import koCommon from "./locales/ko";
 import { DEFAULT_LOCALE } from "./locale";
 import { detectSystemLocale } from "./systemLocale";
+import {
+  localizeMobileBrandResource,
+  MOBILE_PRODUCT_NAME,
+} from "@/config/mobileBrand";
 
 export {
   DEFAULT_LOCALE,
@@ -33,11 +36,11 @@ export type { LocalePreference, SupportedLocale } from "./locale";
 export { detectSystemLocale } from "./systemLocale";
 
 const resources = {
-  en: { common: enCommon },
-  "zh-CN": { common: zhCNCommon },
-  "zh-TW": { common: zhTWCommon },
-  ja: { common: jaCommon },
-  ko: { common: koCommon },
+  en: { common: localizeMobileBrandResource(enCommon) },
+  "zh-CN": { common: localizeMobileBrandResource(zhCNCommon) },
+  "zh-TW": { common: localizeMobileBrandResource(zhTWCommon) },
+  ja: { common: localizeMobileBrandResource(jaCommon) },
+  ko: { common: localizeMobileBrandResource(koCommon) },
 } as const;
 
 // 同步 init —— 没有 backend / detector / suspense,i18n.init 立即返回。
@@ -51,7 +54,7 @@ void i18n.use(initReactI18next).init({
   interpolation: {
     escapeValue: false, // React 已转义
     // 品牌名单一事实源:文案里的 {{appName}} 全部由此注入(与 desktop 同约定)。
-    defaultVariables: { appName: BRAND_NAME },
+    defaultVariables: { appName: MOBILE_PRODUCT_NAME },
   },
   returnNull: false,
 });

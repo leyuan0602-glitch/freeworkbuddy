@@ -707,6 +707,7 @@ end
     process.env.CINDY_DISTRIBUTION_PROFILE = 'freeworkbuddy-selfhost';
     // 不得要求 self-host-regions.json(独立发行不走官方地区分包投影)。
     const selfhost = buildConfig({ config: appJson.expo });
+    expect(selfhost.name).toBe('FreeWorkBuddy');
     expect(selfhost.scheme).toBe('freeworkbuddy');
     expect(selfhost.ios.bundleIdentifier).toBe('me.freeworkbuddy.ios');
     expect(selfhost.android.package).toBe('me.freeworkbuddy.android');

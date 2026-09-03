@@ -27,7 +27,13 @@ import {
 import { useLoginHandoffOptional } from '@/auth/MobileLoginHandoffContext';
 import { useLoginFirstLaunchLight } from '@/auth/loginFirstLaunchGate';
 import { resolveStartupSplashHandoff } from '@/auth/startupSplashContinuity';
+import { Text } from '@/components/AppText';
 import { ThemeOverrideProvider, useTheme } from '@/theme';
+import { fontWeight, typeScale } from '@/theme/tokens';
+import {
+  IS_FREEWORKBUDDY_SELFHOST,
+} from '@/config/env';
+import { MOBILE_PRODUCT_NAME } from '@/config/mobileBrand';
 
 /**
  * MobileLoginHandoffStage —— 白底体系登录/闸门**唯一 full-viewport 品牌宿主**
@@ -310,12 +316,29 @@ function MobileLoginHandoffStageInner({
               source={heroSource}
               style={boxStyle(stage.cindy)}
             />
-            <Image
-              accessibilityIgnoresInvertColors
-              resizeMode="contain"
-              source={wordmarkSource}
-              style={boxStyle(stage.word)}
-            />
+            {IS_FREEWORKBUDDY_SELFHOST ? (
+              <View
+                style={[boxStyle(stage.word), styles.selfHostWordmarkFrame]}
+              >
+                <Text
+                  adjustsFontSizeToFit
+                  numberOfLines={1}
+                  style={[
+                    styles.selfHostWordmark,
+                    { color: colors.login.titleText },
+                  ]}
+                >
+                  {MOBILE_PRODUCT_NAME}
+                </Text>
+              </View>
+            ) : (
+              <Image
+                accessibilityIgnoresInvertColors
+                resizeMode="contain"
+                source={wordmarkSource}
+                style={boxStyle(stage.word)}
+              />
+            )}
           </Animated.View>
           {/* Slogan:splash 期隐藏,面板起步后 100ms 渐显(终位固定不随簇移) */}
           <Animated.View
@@ -360,5 +383,15 @@ const styles = StyleSheet.create({
     position: 'absolute',
     // stage → 物理 px:整层 transform 缩放,原点钉左上(demo transform-origin:0 0)
     transformOrigin: 'top left',
+  },
+  selfHostWordmarkFrame: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selfHostWordmark: {
+    fontSize: typeScale.hero,
+    fontWeight: fontWeight.semibold,
+    textAlign: 'center',
+    width: '100%',
   },
 });

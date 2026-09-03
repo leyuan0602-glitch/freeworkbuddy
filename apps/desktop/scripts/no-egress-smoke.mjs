@@ -122,6 +122,7 @@ function hostMatchesAny(host, exactSet, parents) {
 
 const tmpUserData = fs.mkdtempSync(path.join(os.tmpdir(), 'fwb-no-egress-'));
 console.log(`[no-egress] userData: ${tmpUserData}`);
+const reportPath = path.join(tmpUserData, AUDIT_REPORT_FILE);
 
 const child = spawn(
   exePath,
@@ -137,16 +138,40 @@ child.stderr.on('data', (chunk) => {
   stderrBuf += chunk.toString();
 });
 
+let cleanupKillRequested = false;
+const reportPoll = setInterval(() => {
+  if (!fs.existsSync(reportPath)) return;
+  clearInterval(reportPoll);
+  // Electron can leave Chromium helpers alive after app.exit() on a fully initialized app.
+  // Once the atomic report exists, give native teardown a short grace period, then reap it.
+  setTimeout(() => {
+    if (child.exitCode !== null || child.signalCode !== null) return;
+    cleanupKillRequested = true;
+    child.kill('SIGKILL');
+  }, 2000).unref();
+}, 100);
+reportPoll.unref();
+
 const timeoutHandle = setTimeout(() => {
+  clearInterval(reportPoll);
   console.error(`[no-egress] ERROR: timeout after ${options.timeoutMs}ms, killing process`);
   try { child.kill('SIGKILL'); } catch { /* noop */ }
 }, options.timeoutMs);
 
 child.on('exit', (code, signal) => {
   clearTimeout(timeoutHandle);
+  clearInterval(reportPoll);
   console.log(`[no-egress] child exited: ${signal ? `signal=${signal}` : `code=${code}`}`);
 
-  const reportPath = path.join(tmpUserData, AUDIT_REPORT_FILE);
+  if ((signal || code !== 0) && !(cleanupKillRequested && signal === 'SIGKILL')) {
+    console.error(
+      `[no-egress] FAIL: audit process did not exit cleanly (${signal ? `signal=${signal}` : `code=${code}`})`,
+    );
+    if (stderrBuf.trim()) console.error(stderrBuf.trim().split('\n').slice(-15).join('\n'));
+    cleanup();
+    process.exit(1);
+  }
+
   if (!fs.existsSync(reportPath)) {
     console.error('[no-egress] FAIL: audit report missing(main 未写出 no-egress-requests.json)');
     if (stderrBuf.trim()) console.error(stderrBuf.trim().split('\n').slice(-15).join('\n'));

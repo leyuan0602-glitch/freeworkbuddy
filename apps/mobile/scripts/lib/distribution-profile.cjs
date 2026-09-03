@@ -29,6 +29,7 @@ const OFFICIAL_DISTRIBUTION_IDS = Object.freeze(['cindy-cn', 'cindy-global', 'ci
  */
 const SELFHOST_FREEWORKBUDDY_MOBILE = Object.freeze({
   distributionId: 'freeworkbuddy-selfhost',
+  productName: 'FreeWorkBuddy',
   scheme: 'freeworkbuddy',
   iosBundleIdentifier: 'me.freeworkbuddy.ios',
   androidPackage: 'me.freeworkbuddy.android',
