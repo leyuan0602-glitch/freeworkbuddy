@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import path from 'node:path';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { appendFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
 import Database from 'better-sqlite3';
@@ -100,6 +100,7 @@ describe('legacy-import IPC', () => {
   it('execute:来自 discover 的路径导入成功', () => {
     const file = seedLegacyDb('bob', [{ id: 's-1', title: '任务一' }]);
     state.targetDb = createTargetDb();
+    state.handlers.get(LEGACY_IMPORT_DISCOVER_CHANNEL)!(EVENT);
     const result = state.handlers.get(LEGACY_IMPORT_EXECUTE_CHANNEL)!(EVENT, {
       filePaths: [file],
     }) as { results: Array<{ ok: boolean; sessions: { rowsInserted: number } }> };
@@ -131,20 +132,95 @@ describe('legacy-import IPC', () => {
   it('execute:目标库未初始化时抛受控错误', () => {
     state.targetDb = null;
     const file = seedLegacyDb('carol', [{ id: 's-1', title: 'x' }]);
+    state.handlers.get(LEGACY_IMPORT_DISCOVER_CHANNEL)!(EVENT);
     expect(() =>
       state.handlers.get(LEGACY_IMPORT_EXECUTE_CHANNEL)!(EVENT, { filePaths: [file] }),
     ).toThrow('not initialized');
   });
 
-  it('isAcceptableLegacyPath:discover 结果内或候选目录形态内放行,其余拒绝', () => {
+  it('isAcceptableLegacyPath:只放行 discovery 中的原始 regular file', () => {
     const file = seedLegacyDb('dave', [{ id: 's-1', title: 'x' }]);
     const discovery = state.handlers.get(LEGACY_IMPORT_DISCOVER_CHANNEL)!(EVENT) as Parameters<
       typeof isAcceptableLegacyPath
     >[1];
     expect(isAcceptableLegacyPath(file, discovery)).toBe(true);
-    // discover 之后新增的同形态文件仍放行(候选目录 + cindy-*.db)
-    expect(isAcceptableLegacyPath(path.join(path.dirname(file), 'cindy-new.db'), discovery)).toBe(true);
+    expect(isAcceptableLegacyPath(path.join(path.dirname(file), 'cindy-new.db'), discovery)).toBe(false);
     expect(isAcceptableLegacyPath(path.join(state.appDataDir, 'evil.db'), discovery)).toBe(false);
     expect(isAcceptableLegacyPath('/etc/passwd', discovery)).toBe(false);
+  });
+
+  it('execute:拒绝未经过当前 renderer discover 授权的新文件', () => {
+    const discovered = seedLegacyDb('grant', [{ id: 's-1', title: 'x' }]);
+    state.targetDb = createTargetDb();
+    state.handlers.get(LEGACY_IMPORT_DISCOVER_CHANNEL)!(EVENT);
+
+    const added = path.join(path.dirname(discovered), 'cindy-added.db');
+    const db = new Database(added);
+    db.exec('CREATE TABLE sessions (id TEXT PRIMARY KEY, title TEXT)');
+    db.close();
+
+    const result = state.handlers.get(LEGACY_IMPORT_EXECUTE_CHANNEL)!(EVENT, {
+      filePaths: [added],
+    }) as { results: Array<{ rejected?: string }> };
+    expect(result.results[0].rejected).toBe('path-not-from-discovery');
+  });
+
+  it('execute:discovery grant 不可被另一个 renderer 复用', () => {
+    const discovered = seedLegacyDb('owner', [{ id: 's-1', title: 'x' }]);
+    state.targetDb = createTargetDb();
+    const firstRendererEvent = { sender: {} };
+    const secondRendererEvent = { sender: {} };
+    state.handlers.get(LEGACY_IMPORT_DISCOVER_CHANNEL)!(firstRendererEvent);
+
+    const result = state.handlers.get(LEGACY_IMPORT_EXECUTE_CHANNEL)!(secondRendererEvent, {
+      filePaths: [discovered],
+    }) as { results: Array<{ rejected?: string }> };
+    expect(result.results[0].rejected).toBe('path-not-from-discovery');
+  });
+
+  it('execute:discover 后文件 metadata 改变时拒绝', () => {
+    const discovered = seedLegacyDb('changed', [{ id: 's-1', title: 'safe' }]);
+    state.targetDb = createTargetDb();
+    state.handlers.get(LEGACY_IMPORT_DISCOVER_CHANNEL)!(EVENT);
+    appendFileSync(discovered, 'changed-after-discovery');
+
+    const result = state.handlers.get(LEGACY_IMPORT_EXECUTE_CHANNEL)!(EVENT, {
+      filePaths: [discovered],
+    }) as { results: Array<{ rejected?: string }> };
+    expect(result.results[0].rejected).toBe('path-not-from-discovery');
+  });
+
+  it('execute:discover 后替换为 symlink 时拒绝且不读取链接目标', () => {
+    const discovered = seedLegacyDb('swap', [{ id: 's-1', title: 'safe' }]);
+    state.targetDb = createTargetDb();
+    state.handlers.get(LEGACY_IMPORT_DISCOVER_CHANNEL)!(EVENT);
+
+    const outside = path.join(state.appDataDir, 'outside.db');
+    const outsideDb = new Database(outside);
+    outsideDb.exec('CREATE TABLE sessions (id TEXT PRIMARY KEY, title TEXT)');
+    outsideDb.prepare('INSERT INTO sessions (id, title) VALUES (?, ?)').run('outside', 'outside');
+    outsideDb.close();
+    rmSync(discovered);
+    symlinkSync(outside, discovered);
+
+    const result = state.handlers.get(LEGACY_IMPORT_EXECUTE_CHANNEL)!(EVENT, {
+      filePaths: [discovered],
+    }) as { results: Array<{ rejected?: string }> };
+    expect(result.results[0].rejected).toBe('path-not-from-discovery');
+    expect(state.targetDb.prepare('SELECT COUNT(*) AS n FROM sessions').get()).toEqual({ n: 0 });
+  });
+
+  it('execute:拒绝带 .. 的候选目录路径逃逸', () => {
+    seedLegacyDb('base', [{ id: 's-1', title: 'safe' }]);
+    state.targetDb = createTargetDb();
+    state.handlers.get(LEGACY_IMPORT_DISCOVER_CHANNEL)!(EVENT);
+    const outside = path.join(state.appDataDir, 'cindy-escape.db');
+    writeFileSync(outside, 'not a database');
+    const escaped = path.join(state.appDataDir, 'Cindy', '..', 'cindy-escape.db');
+
+    const result = state.handlers.get(LEGACY_IMPORT_EXECUTE_CHANNEL)!(EVENT, {
+      filePaths: [escaped],
+    }) as { results: Array<{ rejected?: string }> };
+    expect(result.results[0].rejected).toBe('path-not-from-discovery');
   });
 });

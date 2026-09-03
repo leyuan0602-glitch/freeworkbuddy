@@ -67,56 +67,67 @@ function emptyTableStats(): LegacyImportTableStats {
 }
 
 /**
- * 导入单张表:从 legacy db 只读选出交集列,事务内 OR IGNORE 写入 target。
- * 全部行在一个事务内(蓝图:失败回滚不留半截);行数超预算即中止并回滚整表。
+ * 预检单张表:从 legacy db 只读选出交集列并执行行数预算检查,不写 target。
+ * 两张表都通过后才会进入同一个整库事务。
  */
-function importTable(
+interface PreparedTableImport {
+  stats: LegacyImportTableStats;
+  insertable: string[];
+  rows: Array<Record<string, unknown>>;
+}
+
+function prepareTableImport(
   legacyDb: Database.Database,
   targetDb: Database.Database,
   table: 'sessions' | 'messages',
   wantedColumns: readonly string[],
   maxRows: number,
-): LegacyImportTableStats {
+): PreparedTableImport {
   const stats = emptyTableStats();
   const legacyColumns = tableColumns(legacyDb, table);
   if (legacyColumns.length === 0) {
     // 表不存在:不算失败(更旧的 schema),诊断标注。
     stats.tableMissing = true;
-    return stats;
+    return { stats, insertable: [], rows: [] };
   }
   const columns = intersectColumns(legacyColumns, wantedColumns);
   stats.droppedLegacyColumns = legacyColumns.filter((c) => !columns.includes(c));
-  if (columns.length === 0) return stats;
+  if (columns.length === 0) return { stats, insertable: [], rows: [] };
 
   // 预算检查先于取行:超预算不把大表读进内存,也不产生任何写入。
   const countRow = legacyDb.prepare(`SELECT COUNT(*) AS n FROM "${table}"`).get() as { n: number };
   stats.rowsScanned = countRow.n;
   if (countRow.n > maxRows) {
     stats.errorKind = 'budget-exceeded';
-    return stats;
+    return { stats, insertable: [], rows: [] };
   }
 
   const targetColumns = tableColumns(targetDb, table);
   const insertable = columns.filter((c) => targetColumns.includes(c));
-  if (insertable.length === 0) return stats;
+  if (insertable.length === 0) return { stats, insertable, rows: [] };
 
   const rows = legacyDb
     .prepare(`SELECT ${quotedList(columns)} FROM "${table}" ORDER BY rowid ASC`)
     .all() as Array<Record<string, unknown>>;
 
-  const placeholders = insertable.map(() => '?').join(', ');
+  return { stats, insertable, rows };
+}
+
+function applyPreparedTableImport(
+  targetDb: Database.Database,
+  table: 'sessions' | 'messages',
+  prepared: PreparedTableImport,
+): void {
+  if (prepared.insertable.length === 0) return;
+  const placeholders = prepared.insertable.map(() => '?').join(', ');
   const insert = targetDb.prepare(
-    `INSERT OR IGNORE INTO "${table}" (${quotedList(insertable)}) VALUES (${placeholders})`,
+    `INSERT OR IGNORE INTO "${table}" (${quotedList(prepared.insertable)}) VALUES (${placeholders})`,
   );
-  const txn = targetDb.transaction((batch: Array<Record<string, unknown>>) => {
-    for (const row of batch) {
-      const info = insert.run(...insertable.map((c) => row[c] ?? null));
-      if (info.changes > 0) stats.rowsInserted += 1;
-      else stats.rowsSkipped += 1;
-    }
-  });
-  txn(rows);
-  return stats;
+  for (const row of prepared.rows) {
+    const info = insert.run(...prepared.insertable.map((c) => row[c] ?? null));
+    if (info.changes > 0) prepared.stats.rowsInserted += 1;
+    else prepared.stats.rowsSkipped += 1;
+  }
 }
 
 /**
@@ -144,15 +155,27 @@ export function importLegacyDb(
       fileMustExist: true,
     });
     const maxRows = options?.maxRows ?? LEGACY_IMPORT_MAX_ROWS_PER_TABLE;
-    result.sessions = importTable(legacyDb, targetDb, 'sessions', SESSION_COLUMNS, maxRows);
-    result.messages = importTable(legacyDb, targetDb, 'messages', MESSAGE_COLUMNS, maxRows);
-    // 表级 errorKind(如 budget-exceeded)汇总为库级失败,调用方在 UI 里可见。
-    result.ok = result.sessions.errorKind === null && result.messages.errorKind === null;
-    if (!result.ok) {
-      result.errorKind = result.sessions.errorKind ?? result.messages.errorKind;
-    }
+    const sessions = prepareTableImport(legacyDb, targetDb, 'sessions', SESSION_COLUMNS, maxRows);
+    const messages = prepareTableImport(legacyDb, targetDb, 'messages', MESSAGE_COLUMNS, maxRows);
+    result.sessions = sessions.stats;
+    result.messages = messages.stats;
+
+    // Preflight both tables before the first write. Budget/schema diagnostics
+    // therefore cannot leave the earlier table committed.
+    result.errorKind = result.sessions.errorKind ?? result.messages.errorKind;
+    if (result.errorKind) return result;
+
+    targetDb.transaction(() => {
+      applyPreparedTableImport(targetDb, 'sessions', sessions);
+      applyPreparedTableImport(targetDb, 'messages', messages);
+    })();
+    result.ok = true;
     return result;
   } catch (err) {
+    // These counters describe committed effects. The outer transaction has
+    // rolled every inserted row back when execution reaches this branch.
+    result.sessions.rowsInserted = 0;
+    result.messages.rowsInserted = 0;
     const message = err instanceof Error ? err.message : String(err);
     result.errorKind = /no such table/i.test(message)
       ? 'no-such-table'

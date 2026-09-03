@@ -3,7 +3,7 @@
 > 用途：接手 self-hosting 改造的任何人（或下一轮 agent 会话）从这里继续。
 > 计划正本：[`self-hosting-implementation-blueprint.md`](./self-hosting-implementation-blueprint.md)
 > （目标、基线、工作流 A–K、§3.18 分阶段、§3.19 PR 拆分、§3.21 风险清单）。
-> 状态基准日：2026-09-01。分支：PR #2（`feat/freeworkbuddy-capability-ui`）已开，PR #1 已合并。
+> 状态基准日：2026-09-03。分支：PR #2（`feat/freeworkbuddy-capability-ui`）已开，PR #1 已合并。
 
 ## 一、整体进度（对照蓝图 §3.19 PR 拆分）
 
@@ -14,13 +14,14 @@
 | 3 | DistributionProfile schema + 官方回归 | ✅ 已合并 | PR #1 `f46b913a` |
 | 4 | 独立品牌 + Desktop identity（构建链） | ✅ 已合并 | PR #1 `a95eebba` |
 | 5 | Mobile identity | ✅ 已合并（fingerprint 实测不变，冷更确认记录在 commit） | PR #1 `aecf89b6` |
-| 6 | embedded/remote bootstrap + self-host 信任根 + 单 realm | ✅ 已合并 | PR #1 `6a372a14` |
+| 6 | embedded/remote bootstrap + self-host 信任根 + 单 realm | ✅ 已合并；FreeWorkBuddy 当前从 `https://freeworkbuddy.me/endpoint.json` remote bootstrap | PR #1 `6a372a14` + 本轮收口 |
 | 7 | 单 realm auth routing | ✅ 核心并入 #6；issuer/realm 原子绑定随 Phase 2 server | — |
 | 8 | Capability snapshot 管道（main→preload→renderer） | ✅ 已合并 | PR #1 `2135dbcf` |
 | 9 | 逐域迁移 gate | ✅ main 边界半边已合并 `fc4c7ad9`；变化推送/hook/updater 闸在 PR #2 `222d1c96d`；UI 入口逐域隐藏 ✅ `867304a91`（登录/设置/标题栏/侧栏/SkillHub/插件市场） | PR #1 + PR #2 |
 | 10 | 去官方默认值 | ✅ 主体收口：no-egress 验收 `8a997c2b`；TapDB 发行闸 `2d523dd2`；legalLinks profile 化；About 页更新开关/社媒面板已按 capability 隐藏 `867304a91`（LEGAL_LINKS 按法规要求保留） | PR #1 + PR #2 |
-| 11 | Local-first 收口 | ◐ packaged/断网/no-egress macOS 已实测；import adapter ✅ `efee82b56`（代码+27 例单测+设置页入口）；**三平台 UAT 未做** | — |
-| 12–20 | 服务端仓 + Phase 2/3 | ◐ **Phase 2 核心已开发完（本地 commit，未 push）**：scaffold `75cf669` / Auth Core `0db4baa` / device registry+relay+media+push `08df7a9`（`freeworkbuddy-server` 仓，11 测试文件 70 例全绿，typecheck/lint/build/guard 过）；Phase 3 可选云能力按蓝图留接口未实现；**packaged 实机联调未做** | 独立仓 |
+| 11 | Local-first 收口 | ◐ packaged/断网/no-egress macOS 已实测；import adapter 已补 renderer grant、文件指纹复验与整库原子事务；**Windows/Linux packaged UAT 未做** | PR #2 |
+| 12–16 | 服务端仓 + Phase 2 MVP | ◐ Auth、operator login、device registry、relay、media presign、单机 Compose 与静态 manifest 已实现；84 例服务端测试及 typecheck/build/lint/guard 通过；**真实 Compose、迁移/备份恢复、Mobile 双设备 UAT 未做** | 独立仓 |
+| 17–20 | Phase 3 可选云能力 | ⏸ 按蓝图留接口，不进首发关键路径；对应 endpoint 保持空串且客户端 capability 关闭 | 独立仓 + 客户端 |
 
 已合并 main 的 commit：`92c234679`（merge PR #1）。PR #2（capability 推送/hook/updater 闸）**未合并**。
 
@@ -42,6 +43,25 @@
    device registry/relay/media/push `08df7a9`（upgrade 前 JWT、hello 协商、
    src 覆写、三限流、Redis 目录 fail closed、S3 presign）。API 入口接线：
    Bearer token → identity resolver fail closed。11 测试文件 70 例全绿。
+
+## 二点一、2026-09-03 安全与部署收口
+
+1. **客户端 capability 强制边界**：`requireAppCapability` 改为消费 main 侧真实快照，发行策略、
+   endpoint 与 session 任一不满足都 fail closed；FreeWorkBuddy profile 改为 remote manifest，
+   只打开 account、device-link 与 website。
+2. **Legacy Import P0 修复**：discovery grant 按 renderer 隔离；执行前复验 realpath、软链接、
+   文件类型、大小、mtime/ctime、dev/ino；sessions/messages 使用一个 outer transaction，任一失败
+   保证零写入。
+3. **Auth P0 修复**：challenge 原子消费与失败计数，refresh reuse/logout 原子撤销 family；所有
+   受保护 API 统一执行 JWT 验签与 session-active 检查。新增 operator login，管理员可生成/轮换
+   一次显示的 6 位登录码，无需首期邮件服务。
+4. **Relay P0 修复**：production 强制 issuer/audience/realm/RS256；logout/reuse 会写 Redis session
+   deny marker 并踢掉同 session 连接；客户端稳定 deviceId 可幂等进入 durable registry。
+5. **单机部署清单**：Caddy 统一承载 TLS、静态 manifest/法律页、API 与 WebSocket 反代；PostgreSQL、
+   Redis、API、relay 不暴露宿主端口；JWT 私钥仅挂给 API，OSS 使用阿里云外部 endpoint。
+6. **验证**：服务端 `typecheck/test/build/lint/guard` 全绿（11 files / 84 tests），Compose config
+   可展开，生产 endpoint.json 已通过客户端 parser。Docker daemon 当前未运行，因此镜像构建、
+   真实 migration 与 backup/restore smoke 尚无证据。
 
 ## 二点五、2026-09-02 本地全链路联调（已验证可用）
 
@@ -69,7 +89,7 @@
 ## 三、关键技术决策（已定，勿推翻）
 
 1. **发行维度**：`CINDY_DISTRIBUTION_PROFILE` env（缺省=官方路径逐字节不变；`freeworkbuddy-selfhost` = FreeWorkBuddy）。单一选取入口 `resolveDistributionProfile`（maker-shared `./distribution-profile`）。
-2. **FreeWorkBuddy 身份值**：`me.freeworkbuddy.ios/.android/.desktop`、scheme/userData/凭据 namespace = `freeworkbuddy`、companyName=`leyuan0602-glitch`、法律 URL 占位 `https://freeworkbuddy.me/{privacy,terms}`（Phase 2 部署时替换真实路径）。
+2. **FreeWorkBuddy 身份值**：`me.freeworkbuddy.ios/.android/.desktop`、scheme/userData/凭据 namespace = `freeworkbuddy`、companyName=`leyuan0602-glitch`；法律页由 `https://freeworkbuddy.me/{privacy,terms}` 同源提供。
 3. **realm**：self-host v1 内部 `authRealm='global'`、`crossRealmOrgLoginEnabled=false`；官方 cn/global 双 realm 行为不变。
 4. **capability**：17 键 taxonomy（maker-shared `DISTRIBUTION_CAPABILITY_KEYS`），四层计算 = build ∧ distribution defaults ∧ endpoint present ∧ session。main 是真相源；renderer 只消费布尔投影（`useAppCapabilities`，判断用 `=== false`）。
 5. **打包**：本机 `electron-forge package`（先 `node scripts/build-remote-bundles.mjs`，`NODE_OPTIONS='--max-old-space-size=8192'`，renderer OOM 大户）。产物先 macOS。
@@ -82,12 +102,9 @@
 
 ## 五、已知遗留问题
 
-1. desktop 单测存量基线失败（均 stash 对照验证过，先于 self-hosting 改造存在）：
-   `BillingPage.test.tsx` 2 例；`piNativeProviders.test.ts` 套件损坏（`42ffcffce`
-   给 host 模块加了 `getGrokAccessToken`，该测试的 grok mock 未同步）；
-   `LoginPage.{harness,pr2a.harness,region.harness,regionPill}.test.tsx` 4 个套件损坏
-   （`f8849d6ba` 让 legalLinks 进入 LoginPage 模块图后，这些文件的 brandRegion
-   mock 工厂缺 `CURRENT_DISTRIBUTION_BRAND` 导出，模块求值即抛）。
+1. desktop 单测原有基线失败已在本轮补齐测试 fixture：Grok mock 增加
+   `getGrokAccessToken`，LoginPage mock 增加 `CURRENT_DISTRIBUTION_BRAND`，Billing 日期 fixture
+   改为跨时区稳定值。定向回归 202 passed、2 skipped。
 2. desktop threads 池 SIGSEGV：**注册全局 setupFiles 后 100% 复现**（本机 Node 24 +
    vitest threads worker），去掉 setupFiles、改 per-test 显式注入后稳定；forks 池
    不受影响。勿再往 `vitest.config.ts` 加 setupFiles。
@@ -132,19 +149,15 @@ PATH：`PATH="/Users/yuan/.local/state/fnm_multishells/84059_1788176933773/bin:$
   <yuan@leyuan.glitch.local>` 与 author 不一致，是多余噪音（DCO App 判定看
   任一匹配 author 的 trailer，故已推 commit 合规；新增 commit 勿再手写）。
 
-## 八、剩余工作清单（按优先级）
+## 八、剩余工作清单（需要外部环境或后续产品决策）
 
-1. **push 与 PR**：PR #2 分支现有 4 个新 commit（`efee82b56` import adapter、
-   `867304a91` UI gate、`bca843dc9` forge.config 修复、本文档更新）未 push；
-   `freeworkbuddy-server` 6 个 commit（scaffold/Auth Core/device+relay+media+push +
-   `c2d7c67`/`17bc700`/`f1a59ee` 本地联调修复）未 push。push 时机由用户决定。
+1. **push 与 PR**：本轮提交完成后仍需由用户明确决定 push 时机；客户端进入现有 PR #2，
+   服务端首次 push 到独立 private 仓。
 2. **三平台 packaged UAT**（Windows/Linux 需对应环境或 CI runner——Actions 额度未恢复前需外部方案）：含设置页 legacy import 真实导入演练、UI 入口隐藏的 self-host 构建目检。
-3. **Mobile 侧同构 capability projection**（蓝图 §3.6 Mobile 部分，未做）。
-4. **服务端 Phase 2 收尾**：用户实机完成 UI 登录闭环（验证码在
-   `/tmp/freeworkbuddy-dev-codes.log`）；S3 media 路由 UI 侧验证；备份/监控启用；
-   Docker Desktop 本机损坏需人工修复/升级；wrapper 120s 超时 + 每次清缓存的死结待决策
-   （改脚本或提高超时，见二点五节 6）。
+3. **Mobile 侧完整 capability projection**：首期账号/device-link 已可从 endpoint manifest 取值；
+   尚需在启用 Phase 3 功能前把 voice、OAuth、push、更新等 UI/后台任务统一接入同构 capability。
+4. **服务端 Phase 2 环境验收**：Docker 可用后执行真实 PostgreSQL migration、Compose build、
+   backup/restore smoke；DNS/TLS/OSS 配置完成后跑 Desktop + iOS + Android 双设备 UAT。设备 DELETE
+   当前会踢掉在线连接，但不会永久撤销该设备持有的 auth session；正式提供“移除设备”前需把
+   device registry 删除与 session/family 撤销做成同一业务动作。
 5. **Phase 3 可选云能力**（§3.19 17-20）：蓝图明确「按需、不进关键路径」，接口已留，暂不实现。
-6. **存量基线失败修复**（第五节 1，与本改造无关，建议独立小 PR）：piNativeProviders
-   grok mock 补 `getGrokAccessToken`；4 个 LoginPage 测试的 brandRegion mock 补
-   `CURRENT_DISTRIBUTION_BRAND`（或改用部分 mock）。

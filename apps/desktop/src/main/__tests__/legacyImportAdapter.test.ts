@@ -190,6 +190,39 @@ describe('importLegacyDb', () => {
       expect(stats.messages.errorKind).toBe('budget-exceeded');
       expect(stats.ok).toBe(false);
       expect(stats.errorKind).toBe('budget-exceeded');
+      expect(target.prepare('SELECT COUNT(*) AS n FROM sessions').get()).toEqual({ n: 0 });
+      expect(target.prepare('SELECT COUNT(*) AS n FROM messages').get()).toEqual({ n: 0 });
+    } finally {
+      target.close();
+    }
+  });
+
+  it('messages 写入失败时 sessions 也回滚(整库原子)', () => {
+    const legacyFile = resolveLegacyDbPath(dir, 'atomic');
+    const legacy = createLegacyDb(legacyFile);
+    legacy.close();
+    const target = createBetterSqliteDatabase(path.join(dir, 'target.db'));
+    target.exec(`
+      CREATE TABLE sessions (id TEXT PRIMARY KEY, title TEXT, working_dir TEXT, created_at INTEGER, updated_at INTEGER);
+      CREATE TABLE messages (
+        id TEXT PRIMARY KEY,
+        client_id TEXT,
+        session_id TEXT,
+        role TEXT,
+        content TEXT NOT NULL CHECK (content = 'never-match'),
+        created_at INTEGER
+      );
+      CREATE TRIGGER reject_legacy_messages
+      BEFORE INSERT ON messages
+      BEGIN
+        SELECT RAISE(ABORT, 'reject legacy message');
+      END;
+    `);
+    try {
+      const stats = importLegacyDb(legacyFile, target);
+      expect(stats.ok).toBe(false);
+      expect(stats.errorKind).toBe('txn-failed');
+      expect(target.prepare('SELECT COUNT(*) AS n FROM sessions').get()).toEqual({ n: 0 });
       expect(target.prepare('SELECT COUNT(*) AS n FROM messages').get()).toEqual({ n: 0 });
     } finally {
       target.close();

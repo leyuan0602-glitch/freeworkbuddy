@@ -228,9 +228,11 @@ export function requireAppCapability(
   capability: keyof AppCapabilities,
   message = 'This feature requires a Cindy account.',
 ): void {
-  const session = getActiveAppSession();
   const boundaryPending = isAppSessionBoundaryPending();
-  if (deriveAppCapabilities(session.mode, boundaryPending)[capability]) return;
+  // Main is the enforcement boundary. The legacy six-key projection returned
+  // here already includes session, distribution-policy, and endpoint checks;
+  // using deriveAppCapabilities directly would silently bypass the latter two.
+  if (getAppCapabilities()[capability]) return;
   if (boundaryPending) {
     throwIpcError(
       'PRECONDITION_FAILED',

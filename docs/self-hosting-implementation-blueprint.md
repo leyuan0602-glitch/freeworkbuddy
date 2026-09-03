@@ -1,6 +1,8 @@
 # FreeWorkBuddy Self-hosting 改造实施计划
 
-> 状态：实施方案，尚未修改运行时代码或 wire protocol
+> 状态：实施方案正本；Phase 1 与 Phase 2 MVP 已进入实现，完成度以
+> [`self-hosting-progress.md`](./self-hosting-progress.md) 为准。现阶段仍保持既有 wire
+> protocol，不以改协议来规避兼容问题。
 > 范围：本客户端仓，以及独立的 FreeWorkBuddy 服务端仓
 > 基线日期：2026-09-01
 
@@ -18,12 +20,13 @@
 | 本地目录 | 客户端 `/Users/yuan/gsp-workspace/cindy`；服务端 `/Users/yuan/gsp-workspace/freeworkbuddy-server` |
 | 首个部署域名 | `freeworkbuddy.me`；子域在服务上线前按职责配置 |
 | 首台服务器 | 阿里云轻量应用服务器，香港地域，Ubuntu 24.04，2 CPU / 1 GB / 30 GB |
-| 首阶段范围 | Local-first Desktop、独立发行身份、embedded endpoint manifest、capability gate、官方运行时流量归零 |
-| 暂缓 | 邮件登录、正式认证、Mobile push、Apple / Windows 签名、镜像仓库、自动更新发布、可选云能力 |
+| 首阶段范围 | Local-first Desktop、独立发行身份、capability gate、官方运行时流量归零；随后以 `freeworkbuddy.me` remote manifest 启用账号与 device-link |
+| 暂缓 | 邮件投递、Mobile push、Apple / Windows 签名、镜像仓库、自动更新发布、可选云能力 |
 
-服务端、DNS、SSH 和 OSS 资源已经具备开工条件，但 Phase 1 的 Local-first Desktop 不依赖它们。
-第一台 1 GB 服务器只作为开发和轻量集成环境；生产期的数据库、Redis、relay 与可观测性是否
-同机部署，要在压测和内存基线完成后再决定。
+服务端、DNS、SSH 和 OSS 资源已经具备开工条件。Phase 1 的 Local-first Desktop 不依赖它们；
+Phase 2 通过同一发行 profile 的 remote manifest 打开账号与 device-link，并继续关闭所有尚未
+部署的云能力。第一台 1 GB 服务器只作为开发和轻量集成环境；生产期的数据库、Redis、relay
+与可观测性是否同机部署，要在压测和内存基线完成后再决定。
 
 ### 开发资源与操作入口
 

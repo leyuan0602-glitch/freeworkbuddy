@@ -11,6 +11,7 @@ import { BUNDLED_CATALOG, type Catalog } from '@cindy/model-providers';
 
 vi.mock('../grok-oauth-login.js', () => ({
   hasGrokOAuthLogin: () => true,
+  getGrokAccessToken: async () => null,
 }));
 
 vi.mock('../anthropic-compat-proxy-host.js', () => ({

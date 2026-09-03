@@ -533,19 +533,17 @@ export function assertDistributionProfile(profile: DistributionProfile): Distrib
 }
 
 // ---------------------------------------------------------------------------
-// FreeWorkBuddy self-host profile(蓝图 §3.7 形态 A:Local-first Desktop)
+// FreeWorkBuddy self-host profile(蓝图 §3.7 形态 B:自建 control plane)
 // ---------------------------------------------------------------------------
 
 /**
  * FreeWorkBuddy 独立发行 profile。
  *
  * owner 决策(2026-09-01,蓝图 §3.21 决策清单):
- *  - 维护主体:个人维护者(leyuan0602-glitch);法律页面 Phase 2 部署前为
- *    freeworkbuddy.me 占位 URL(校验只要求 https 形态);
- *  - 首阶段 Local-first:endpoint manifest 为 embedded(不做网络自举),
- *    托管能力 capabilityDefaults 全关;telemetry / update 全部 disabled;
- *  - trustedEndpointDomains 是部署域占位信任根,embedded 模式下不参与
- *    网络自举,供 Phase 2 切 remote 时复用同一 profile 结构。
+ *  - 维护主体:个人维护者(leyuan0602-glitch);法律页面由同源站点提供;
+ *  - endpoint manifest 从唯一受信 origin 拉取，只启用已落地的账号、
+ *    device-link 与官网能力；其余云能力保持关闭并由 UI capability-gate;
+ *  - telemetry / update 不接官方服务，继续 disabled。
  * 机密(签名私钥 / keystore 密码)不在此处,由外部 secret 提供。
  */
 export const SELFHOST_FREEWORKBUDDY_PROFILE: DistributionProfile = assertDistributionProfile(
@@ -569,15 +567,29 @@ export const SELFHOST_FREEWORKBUDDY_PROFILE: DistributionProfile = assertDistrib
       termsUrl: 'https://freeworkbuddy.me/terms',
     }),
     endpointManifest: Object.freeze({
-      mode: 'embedded',
+      mode: 'remote',
+      bootstrapUrl: 'https://freeworkbuddy.me/endpoint.json',
       trustedEndpointDomains: Object.freeze(['freeworkbuddy.me']),
     }),
-    capabilityDefaults: Object.freeze(
-      Object.fromEntries(DISTRIBUTION_CAPABILITY_KEYS.map((k) => [k, false])) as Record<
-        DistributionCapabilityKey,
-        boolean
-      >,
-    ),
+    capabilityDefaults: Object.freeze({
+      canUseAccount: true,
+      canUseDeviceLink: true,
+      canUseManagedModels: false,
+      canUseManagedVoice: false,
+      canUseOAuthBroker: false,
+      canUseHostedTelegramHook: false,
+      canUseHostedXHook: false,
+      canUseHostedSlackHook: false,
+      canUploadPublicAssets: false,
+      canUseFeedback: false,
+      canUseSkillHubCloud: false,
+      canUsePluginMarket: false,
+      canPublishPlugins: false,
+      canSendHeartbeat: false,
+      canCheckDesktopUpdates: false,
+      canOpenWebsite: true,
+      canSendTelemetry: false,
+    }),
     telemetryPolicy: 'disabled',
     updateMode: 'disabled',
   }),
