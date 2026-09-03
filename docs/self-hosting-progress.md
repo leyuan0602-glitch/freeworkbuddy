@@ -20,7 +20,7 @@
 | 9 | 逐域迁移 gate | ✅ main 边界半边已合并 `fc4c7ad9`；变化推送/hook/updater 闸在 PR #2 `222d1c96d`；UI 入口逐域隐藏 ✅ `867304a91`（登录/设置/标题栏/侧栏/SkillHub/插件市场） | PR #1 + PR #2 |
 | 10 | 去官方默认值 | ✅ 主体收口：no-egress 验收 `8a997c2b`；TapDB 发行闸 `2d523dd2`；legalLinks profile 化；About 页更新开关/社媒面板已按 capability 隐藏 `867304a91`（LEGAL_LINKS 按法规要求保留） | PR #1 + PR #2 |
 | 11 | Local-first 收口 | ◐ packaged/断网/no-egress macOS 已实测；import adapter 已补 renderer grant、文件指纹复验与整库原子事务；**Windows/Linux packaged UAT 未做** | PR #2 |
-| 12–16 | 服务端仓 + Phase 2 MVP | ◐ Auth、operator login、device registry、relay、media presign、单机 Compose 与静态 manifest 已实现；84 例服务端测试及 typecheck/build/lint/guard 通过；**真实 Compose、迁移/备份恢复、Mobile 双设备 UAT 未做** | 独立仓 |
+| 12–16 | 服务端仓 + Phase 2 MVP | ◐ Auth、operator login、device registry、relay、media presign、单机 Compose 与静态 manifest 已实现；86 例服务端测试及 typecheck/build/lint/guard 通过；**真实 Compose、迁移/备份恢复、Mobile 双设备 UAT 未做** | 独立仓 |
 | 17–20 | Phase 3 可选云能力 | ⏸ 按蓝图留接口，不进首发关键路径；对应 endpoint 保持空串且客户端 capability 关闭 | 独立仓 + 客户端 |
 
 已合并 main 的 commit：`92c234679`（merge PR #1）。PR #2（capability 推送/hook/updater 闸）**未合并**。
@@ -61,9 +61,11 @@
    一次显示的 6 位登录码，无需首期邮件服务。
 5. **Relay P0 修复**：production 强制 issuer/audience/realm/RS256；logout/reuse 会写 Redis session
    deny marker 并踢掉同 session 连接；客户端稳定 deviceId 可幂等进入 durable registry。
-6. **单机部署清单**：Caddy 统一承载 TLS、静态 manifest/法律页、API 与 WebSocket 反代；PostgreSQL、
+6. **设备移除闭环**：删除 registry 行前先撤销该设备全部 refresh family、写 session deny marker
+   并广播 relay 踢线；发布失败保留 registry 行供幂等补偿重试，旧 access/refresh token 均不可重连。
+7. **单机部署清单**：Caddy 统一承载 TLS、静态 manifest/法律页、API 与 WebSocket 反代；PostgreSQL、
    Redis、API、relay 不暴露宿主端口；JWT 私钥仅挂给 API，OSS 使用阿里云外部 endpoint。
-7. **验证**：服务端 `typecheck/test/build/lint/guard` 全绿（11 files / 84 tests），Compose config
+8. **验证**：服务端 `typecheck/test/build/lint/guard` 全绿（11 files / 86 tests），Compose config
    可展开，生产 endpoint.json 已通过客户端 parser。Docker daemon 当前未运行，因此镜像构建、
    真实 migration 与 backup/restore smoke 尚无证据。
 
@@ -161,7 +163,5 @@ PATH：`PATH="/Users/yuan/.local/state/fnm_multishells/84059_1788176933773/bin:$
 3. **Mobile 侧完整 capability projection**：首期账号/device-link 已可从 endpoint manifest 取值；
    尚需在启用 Phase 3 功能前把 voice、OAuth、push、更新等 UI/后台任务统一接入同构 capability。
 4. **服务端 Phase 2 环境验收**：Docker 可用后执行真实 PostgreSQL migration、Compose build、
-   backup/restore smoke；DNS/TLS/OSS 配置完成后跑 Desktop + iOS + Android 双设备 UAT。设备 DELETE
-   当前会踢掉在线连接，但不会永久撤销该设备持有的 auth session；正式提供“移除设备”前需把
-   device registry 删除与 session/family 撤销做成同一业务动作。
+   backup/restore smoke；DNS/TLS/OSS 配置完成后跑 Desktop + iOS + Android 双设备 UAT。
 5. **Phase 3 可选云能力**（§3.19 17-20）：蓝图明确「按需、不进关键路径」，接口已留，暂不实现。
