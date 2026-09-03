@@ -204,16 +204,25 @@ function withNativeAuthPlugins(plugins, env) {
 
 module.exports = (context = {}) => {
   const baseConfig = context.config ?? appJson.expo;
-  const region = resolveRegion();
   // 发行身份(工作流 B):缺省 = 官方路径,行为与历史逐字节一致;
   // freeworkbuddy-selfhost → 独立 app 身份 + 隐含自建 OTA 语义(下方 selfHosted 分支)。
   // 官方 id 与 region 矛盾 / 未知 id 直接抛错,不回退。
   const distribution = resolveMobileDistribution(process.env);
-  const mobileBuildEnv = resolveMobileBuildEnv();
+  // FreeWorkBuddy 是单 realm(global)。不能沿用 app.config 的历史 CN 缺省，
+  // 否则启动闸门会拿 global manifest 按 cn 校验并永久阻断。
+  const region = distribution.kind === 'selfhost' ? 'global' : resolveRegion();
+  const mobileBuildEnv =
+    distribution.kind === 'selfhost'
+      ? {
+          EXPO_PUBLIC_CINDY_AUTH_REGION: 'global',
+          EXPO_PUBLIC_ENDPOINT_MANIFEST_BASE_URL:
+            distribution.identity.endpointManifestBaseUrl,
+        }
+      : resolveMobileBuildEnv();
   const mobileBundleEnv = {
     ...mobileBuildEnv,
     EXPO_PUBLIC_ENDPOINT_MANIFEST_PEER_BASE_URL:
-      resolvePeerManifestBaseUrl(region),
+      distribution.kind === 'selfhost' ? '' : resolvePeerManifestBaseUrl(region),
     // CindyDev 的业务服务器切换只需把 CN Release 的可信清单基址内联进 JS。
     // 不写入 extra / resolved ExpoConfig，避免让纯 JS 开发功能改变 runtime fingerprint。
     ...(region === 'dev'
@@ -325,8 +334,8 @@ module.exports = (context = {}) => {
         authRegion: region,
         ...(distribution.kind === 'selfhost'
           ? {
-              // 独立发行投影:capabilityDefaults 全关(endpoint manifest embedded)、
-              // telemetry/update disabled 由运行时消费端按 distributionId 判定;
+              // 独立发行投影:账号与 device-link 由 FreeWorkBuddy manifest 提供；
+              // telemetry/update 继续由运行时按 distributionId 关闭；
               // TapDB / Google 一律不烘焙(telemetryPolicy=disabled)。
               distributionId: distribution.distributionId,
               regionConfigSource: 'distribution-profile',

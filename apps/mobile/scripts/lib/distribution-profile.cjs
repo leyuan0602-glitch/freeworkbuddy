@@ -32,6 +32,7 @@ const SELFHOST_FREEWORKBUDDY_MOBILE = Object.freeze({
   scheme: 'freeworkbuddy',
   iosBundleIdentifier: 'me.freeworkbuddy.ios',
   androidPackage: 'me.freeworkbuddy.android',
+  endpointManifestBaseUrl: 'https://freeworkbuddy.me',
 });
 
 const SELFHOST_DISTRIBUTIONS = Object.freeze({

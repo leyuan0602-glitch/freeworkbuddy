@@ -25,12 +25,17 @@ const configuredExpoExtra =
     xdtProductionEnv?: Record<string, string>;
     cindy?: {
       regionConfigSource?: string;
+      distributionId?: string;
       google?: Partial<MobileGoogleConfig>;
     };
   } | null) ?? {};
 const configuredBuildEnv = (configuredExpoExtra.xdtProductionEnv ??
   {}) as Record<string, string>;
 const configuredRegionGoogle = configuredExpoExtra.cindy?.google;
+export const MOBILE_DISTRIBUTION_ID =
+  configuredExpoExtra.cindy?.distributionId?.trim() || null;
+export const IS_FREEWORKBUDDY_SELFHOST =
+  MOBILE_DISTRIBUTION_ID === 'freeworkbuddy-selfhost';
 
 function configuredValue(key: string): string {
   return process.env[key]?.trim() || configuredBuildEnv[key]?.trim() || '';
@@ -385,6 +390,9 @@ export const DEV_RELEASE_ENDPOINT_MANIFEST_BASE_URL =
     : '';
 
 function trustedMobileRealmManifestBaseUrls(): RealmManifestBaseUrls {
+  if (IS_FREEWORKBUDDY_SELFHOST) {
+    return { cn: '', global: ENDPOINT_MANIFEST_BASE_URL };
+  }
   return BUILD_AUTH_REGION === 'global'
     ? {
         cn: ENDPOINT_MANIFEST_PEER_BASE_URL,
@@ -492,7 +500,8 @@ export function getMobileEndpointRealmConfig(): {
   return {
     buildRegion: BUILD_AUTH_REGION,
     manifestRegion: endpointManifestRegion,
-    crossRealmOrgLoginEnabled: AUTH_REGION !== 'dev',
+    crossRealmOrgLoginEnabled:
+      !IS_FREEWORKBUDDY_SELFHOST && AUTH_REGION !== 'dev',
     realmManifestBaseUrls: trustedMobileRealmManifestBaseUrls(),
   };
 }

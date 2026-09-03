@@ -711,7 +711,13 @@ end
     expect(selfhost.ios.bundleIdentifier).toBe('me.freeworkbuddy.ios');
     expect(selfhost.android.package).toBe('me.freeworkbuddy.android');
     expect(selfhost.extra.cindy.distributionId).toBe('freeworkbuddy-selfhost');
+    expect(selfhost.extra.cindy.authRegion).toBe('global');
     expect(selfhost.extra.cindy.regionConfigSource).toBe('distribution-profile');
+    expect(selfhost.extra.xdtProductionEnv).toEqual({
+      EXPO_PUBLIC_CINDY_AUTH_REGION: 'global',
+      EXPO_PUBLIC_ENDPOINT_MANIFEST_BASE_URL: 'https://freeworkbuddy.me',
+    });
+    expect(process.env.EXPO_PUBLIC_ENDPOINT_MANIFEST_PEER_BASE_URL).toBe('');
     // telemetry disabled:不烘焐 TapDB / Google(镜像 capabilityDefaults 全关)。
     expect(selfhost.extra.cindy.tapdb).toBeUndefined();
     expect(selfhost.extra.cindy.google).toBeUndefined();

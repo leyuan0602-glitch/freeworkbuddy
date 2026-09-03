@@ -49,17 +49,21 @@
 1. **客户端 capability 强制边界**：`requireAppCapability` 改为消费 main 侧真实快照，发行策略、
    endpoint 与 session 任一不满足都 fail closed；FreeWorkBuddy profile 改为 remote manifest，
    只打开 account、device-link 与 website。
-2. **Legacy Import P0 修复**：discovery grant 按 renderer 隔离；执行前复验 realpath、软链接、
+2. **Mobile 自举与单 realm 修复**：FreeWorkBuddy 原生构建强制投影为 global realm，并把
+   `https://freeworkbuddy.me` 烘焙为唯一 manifest base；peer realm URL 留空、跨 realm 组织登录
+   关闭，避免独立发行包回落到 Cindy 官方 CDN 或因 region mismatch 卡死。
+3. **Legacy Import P0 修复**：discovery grant 按 renderer 隔离；执行前复验 realpath、软链接、
    文件类型、大小、mtime/ctime、dev/ino；sessions/messages 使用一个 outer transaction，任一失败
    保证零写入。
-3. **Auth P0 修复**：challenge 原子消费与失败计数，refresh reuse/logout 原子撤销 family；所有
-   受保护 API 统一执行 JWT 验签与 session-active 检查。新增 operator login，管理员可生成/轮换
+4. **Auth P0 修复**：challenge 与 authorization code 原子消费，失败尝试原子计数，并发 refresh
+   reuse/logout 原子撤销 family；所有受保护 API 统一执行 JWT 验签与 session-active 检查。
+   新增 operator login，管理员可生成/轮换
    一次显示的 6 位登录码，无需首期邮件服务。
-4. **Relay P0 修复**：production 强制 issuer/audience/realm/RS256；logout/reuse 会写 Redis session
+5. **Relay P0 修复**：production 强制 issuer/audience/realm/RS256；logout/reuse 会写 Redis session
    deny marker 并踢掉同 session 连接；客户端稳定 deviceId 可幂等进入 durable registry。
-5. **单机部署清单**：Caddy 统一承载 TLS、静态 manifest/法律页、API 与 WebSocket 反代；PostgreSQL、
+6. **单机部署清单**：Caddy 统一承载 TLS、静态 manifest/法律页、API 与 WebSocket 反代；PostgreSQL、
    Redis、API、relay 不暴露宿主端口；JWT 私钥仅挂给 API，OSS 使用阿里云外部 endpoint。
-6. **验证**：服务端 `typecheck/test/build/lint/guard` 全绿（11 files / 84 tests），Compose config
+7. **验证**：服务端 `typecheck/test/build/lint/guard` 全绿（11 files / 84 tests），Compose config
    可展开，生产 endpoint.json 已通过客户端 parser。Docker daemon 当前未运行，因此镜像构建、
    真实 migration 与 backup/restore smoke 尚无证据。
 
