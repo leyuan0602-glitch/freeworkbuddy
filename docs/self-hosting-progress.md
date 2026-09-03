@@ -43,6 +43,29 @@
    src 覆写、三限流、Redis 目录 fail closed、S3 presign）。API 入口接线：
    Bearer token → identity resolver fail closed。11 测试文件 70 例全绿。
 
+## 二点五、2026-09-02 本地全链路联调（已验证可用）
+
+**状态：服务端本地真实跑通 + dev 客户端连上，client → gateway → api/relay 全链路打通。**
+
+1. **本地拓扑**（全部原生服务，Docker Desktop 本机损坏无法启动，绕开）：
+   - postgres 16 原生（127.0.0.1:5432，库 `freeworkbuddy`，三个迁移已应用）
+   - redis 原生（6379）；minio 原生（9000，与 Cohub 共用实例，桶 `freeworkbuddy-local`）
+   - api（8080）+ relay（8081）+ **本地单端口网关 gateway.mjs（8090）**：生产是同 origin 反代（`/api/device-link/ws` upgrade → relay、其余 → api），客户端从同一 base URL 推导 HTTP 与 WS，因此本地必须单端口——gateway HTTP 正向代理到 8080、WS upgrade 原样字节转发（保留 authorization 头）到 8081
+   - env 清单与密钥见服务端仓 `.env`（gitignored）+ `deploy/local/jwt_*.pem`（openssl RSA 2048，gitignored）
+2. **dev 验证码投递**：api 的 `onCodeSend` 钩子在 `NODE_ENV=development` 时把验证码追加写 `/tmp/freeworkbuddy-dev-codes.log`（commit `c2d7c67`）。登录方式：客户端登录页填任意邮箱 → request-code → 取日志里的 code → verify-code 换 RS256 token。
+3. **客户端接入方式**：dev 实例 + file 模式 endpoint 清单（不是 selfhost profile——那是「无服务形态 A」，连服务端属形态 B，用官方身份 + `XDT_ENDPOINT_MANIFEST_FILE` 注入 `deploy/local/endpoint.cindy-dev.json`，localhost http 由 file 模式放行）。隔离沙箱 `XDT_USER_DATA_DIR="$HOME/Library/Application Support/CindyGlobal-dev2-dev"`。
+4. **验证证据**：/healthz、/readyz ok；request-code → 取码 → verify-code 签发 RS256（claims realm/tenant/device/session/gen）→ JWKS 正常；未鉴权 device list 401 / 鉴权后 `{"devices":[]}`；relay WS upgrade（经 8090、真实登录 token）`WS_UPGRADE_OK`；**客户端真实流量证明**——api 日志出现来自客户端进程的 `GET /api/auth/providers 200`，客户端日志确认 `[clientEndpoints] resolved from local manifest file` 与 `[device-link] ws://localhost:8090/api/device-link/ws`。
+5. **本轮修复的真 bug**（已提交）：cindy `forge.config.ts` BRAND_IDENTITY 未 import（forge start 即崩，此前两次 STARTUP_TIMEOUT 的真因，commit `bca843dc9`）；服务端 relay 公钥文件路径解析 + claim 契约漂移（`tenant/device` vs `tenantId/deviceId`，commit `17bc700`）；api dev 码投递（`c2d7c67`）；deploy/local 工具入库（`f1a59ee`）。
+6. **wrapper 死结（待用户决策）**：`restart:desktop:local` 每次启动清 `.vite` 缓存 + `startupReadyTimeoutMs` 硬编码 120s → 本机冷编译 >120s 必然 STARTUP_TIMEOUT → kill。本机替代启动命令：
+   ```bash
+   cd /Users/yuan/gsp-workspace/cindy/apps/desktop
+   XDT_USER_DATA_DIR="$HOME/Library/Application Support/CindyGlobal-dev2-dev" \
+   XDT_ENDPOINT_MANIFEST_FILE=/Users/yuan/gsp-workspace/freeworkbuddy-server/deploy/local/endpoint.cindy-dev.json \
+   pnpm dev:desktop
+   ```
+   （服务端四件套重启：api/relay 各自 dev script + `node deploy/local/gateway.mjs`；依赖本机 postgres/redis/minio 先在跑。）
+7. **边界**：UI 内完成一次真实登录（取码填码到登录成功）尚未由用户实机走完；S3 media 路由 UI 侧验证未做；Docker Desktop 需人工修复/升级。
+
 ## 三、关键技术决策（已定，勿推翻）
 
 1. **发行维度**：`CINDY_DISTRIBUTION_PROFILE` env（缺省=官方路径逐字节不变；`freeworkbuddy-selfhost` = FreeWorkBuddy）。单一选取入口 `resolveDistributionProfile`（maker-shared `./distribution-profile`）。
@@ -111,13 +134,16 @@ PATH：`PATH="/Users/yuan/.local/state/fnm_multishells/84059_1788176933773/bin:$
 
 ## 八、剩余工作清单（按优先级）
 
-1. **push 与 PR**：PR #2 分支现有 3 个新 commit（`efee82b56` import adapter、
-   `867304a91` UI gate、本文档更新）未 push；`freeworkbuddy-server` 3 个 commit
-   （scaffold/Auth Core/device+relay+media+push）未 push。push 时机由用户决定。
+1. **push 与 PR**：PR #2 分支现有 4 个新 commit（`efee82b56` import adapter、
+   `867304a91` UI gate、`bca843dc9` forge.config 修复、本文档更新）未 push；
+   `freeworkbuddy-server` 6 个 commit（scaffold/Auth Core/device+relay+media+push +
+   `c2d7c67`/`17bc700`/`f1a59ee` 本地联调修复）未 push。push 时机由用户决定。
 2. **三平台 packaged UAT**（Windows/Linux 需对应环境或 CI runner——Actions 额度未恢复前需外部方案）：含设置页 legacy import 真实导入演练、UI 入口隐藏的 self-host 构建目检。
 3. **Mobile 侧同构 capability projection**（蓝图 §3.6 Mobile 部分，未做）。
-4. **服务端 Phase 2 收尾**：Media/Push 的 S3/Redis 真实依赖部署联调、Auth Core 与
-   客户端 self-host 信任根的端到端登录演练、备份/监控启用。
+4. **服务端 Phase 2 收尾**：用户实机完成 UI 登录闭环（验证码在
+   `/tmp/freeworkbuddy-dev-codes.log`）；S3 media 路由 UI 侧验证；备份/监控启用；
+   Docker Desktop 本机损坏需人工修复/升级；wrapper 120s 超时 + 每次清缓存的死结待决策
+   （改脚本或提高超时，见二点五节 6）。
 5. **Phase 3 可选云能力**（§3.19 17-20）：蓝图明确「按需、不进关键路径」，接口已留，暂不实现。
 6. **存量基线失败修复**（第五节 1，与本改造无关，建议独立小 PR）：piNativeProviders
    grok mock 补 `getGrokAccessToken`；4 个 LoginPage 测试的 brandRegion mock 补
