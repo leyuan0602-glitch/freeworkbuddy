@@ -190,3 +190,6 @@ github-result-*.json
 
 # 内置插件种子已废弃(改走 plugin-store 安装);历史克隆含私有插件与凭证,永不入仓。
 apps/desktop/resources/builtin-ghosts/
+
+# Agent 会话工作区数据（memory/任务记录），不入仓
+.workbuddy/

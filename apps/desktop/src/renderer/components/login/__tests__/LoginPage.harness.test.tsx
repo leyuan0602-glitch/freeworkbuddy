@@ -12,6 +12,7 @@ import {
 } from '@cindy/auth-client';
 import { createScenarioFetch } from '@cindy/auth-client/fixtures';
 import { __testing as ssoOrgHistoryTesting } from '@/state/ssoOrgHistory';
+import { withAppCapabilities } from '../../../../test/vitest/appCapabilitiesTestBridge';
 
 /**
  * PR1 harness 场景驱动渲染单测(implementation-plan Step 2 WHAT3 + 附录 A)。
@@ -40,6 +41,7 @@ vi.mock('react-i18next', () => ({
 vi.mock('../../../../shared/brandRegion', () => ({
   CURRENT_CINDY_REGION: 'cn',
   CURRENT_APP_ID: 'com.xd.cindycn',
+  CURRENT_DISTRIBUTION_BRAND: null,
 }));
 vi.mock('@/hooks/useLogin', () => ({ useLogin: () => loginHook.value }));
 vi.mock('@/components/title-bar/WindowControls', () => ({ WindowControls: () => null }));
@@ -131,7 +133,7 @@ beforeEach(() => {
     configurable: true,
     // acceptPrivacyConsent:协议门放行时记录「已同意」(TapDB 采集的前置条件)。
     // fire-and-forget,不参与登录派发时序。
-    value: { platform: 'darwin', acceptPrivacyConsent: async () => ({ allowed: true }) },
+    value: withAppCapabilities({ platform: 'darwin', acceptPrivacyConsent: async () => ({ allowed: true }) }),
   });
 });
 
@@ -240,7 +242,7 @@ describe('identifier 态(附录 A providers 场景)', () => {
   ] as const)('登录更多账号在 %s 标题栏右侧提供关闭按钮', async (platform, marginClass) => {
     Object.defineProperty(window, 'electronAPI', {
       configurable: true,
-      value: { platform, acceptPrivacyConsent: async () => ({ allowed: true }) },
+      value: withAppCapabilities({ platform, acceptPrivacyConsent: async () => ({ allowed: true }) }),
     });
     const onClose = vi.fn();
     mount(await identifierState('providers:both'), undefined, 'add-account', onClose);

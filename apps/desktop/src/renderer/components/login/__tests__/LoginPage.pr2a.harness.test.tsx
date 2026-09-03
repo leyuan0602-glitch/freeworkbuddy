@@ -10,6 +10,7 @@ import {
   type VerificationKind,
 } from '@cindy/auth-client';
 import { createScenarioFetch } from '@cindy/auth-client/fixtures';
+import { withAppCapabilities } from '../../../../test/vitest/appCapabilitiesTestBridge';
 
 /**
  * PR2a harness 场景驱动渲染单测(implementation-plan Step 3 + 附录 A)。
@@ -48,6 +49,7 @@ vi.mock('react-i18next', () => ({
 vi.mock('../../../../shared/brandRegion', () => ({
   CURRENT_CINDY_REGION: 'cn',
   CURRENT_APP_ID: 'com.xd.cindycn',
+  CURRENT_DISTRIBUTION_BRAND: null,
 }));
 vi.mock('@/hooks/useLogin', () => ({ useLogin: () => loginHook.value }));
 vi.mock('@/components/title-bar/WindowControls', () => ({ WindowControls: () => null }));
@@ -110,7 +112,7 @@ beforeEach(() => {
     configurable: true,
     // acceptPrivacyConsent:协议门放行时记录「已同意」(TapDB 采集的前置条件)。
     // fire-and-forget,不参与登录派发时序。
-    value: { platform: 'darwin', acceptPrivacyConsent: async () => ({ allowed: true }) },
+    value: withAppCapabilities({ platform: 'darwin', acceptPrivacyConsent: async () => ({ allowed: true }) }),
   });
 });
 

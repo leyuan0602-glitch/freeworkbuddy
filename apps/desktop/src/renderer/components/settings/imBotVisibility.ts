@@ -30,9 +30,30 @@ export function isCnPersonalIdentity(identity: ImBotIdentity): boolean {
   );
 }
 
+/**
+ * 托管 hook 的发行 capability 投影(可选)。三个托管渠道(Telegram/X/Slack)
+ * 全部未部署时(显式 === false),「Cindy」分栏必须整体隐藏,个人 bot 分栏
+ * 不受影响 —— 蓝图 §2.5:空 endpoint 不得留下托管入口。
+ */
+export interface HostedHookCapabilityGates {
+  canUseHostedTelegramHook?: boolean;
+  canUseHostedXHook?: boolean;
+  canUseHostedSlackHook?: boolean;
+}
+
+/** 三个托管 hook 渠道是否至少有一个可用(null/undefined = 快照缺失,不降级)。 */
+export function hasAnyHostedHook(capabilities?: HostedHookCapabilityGates): boolean {
+  if (!capabilities) return true;
+  return !(
+    capabilities.canUseHostedTelegramHook === false &&
+    capabilities.canUseHostedXHook === false &&
+    capabilities.canUseHostedSlackHook === false
+  );
+}
+
 /** 是否提供「Cindy」分栏(官方共享机器人;本地模式与国区个人账号都没有)。 */
-export function showCindyGroup(identity: ImBotIdentity): boolean {
-  return identity.mode !== 'local' && !isCnPersonalIdentity(identity);
+export function showCindyGroup(identity: ImBotIdentity, capabilities?: HostedHookCapabilityGates): boolean {
+  return identity.mode !== 'local' && !isCnPersonalIdentity(identity) && hasAnyHostedHook(capabilities);
 }
 
 /** 个人分栏是否提供 Discord 机器人配置(国区个人账号没有)。 */

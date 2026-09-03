@@ -8,6 +8,8 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { withAppCapabilities } from '../../test/vitest/appCapabilitiesTestBridge';
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
@@ -58,10 +60,10 @@ import { UserInfoSection } from '@/components/sidebar/UserInfoSection';
 beforeEach(() => {
   Object.defineProperty(window, 'electronAPI', {
     configurable: true,
-    value: {
+    value: withAppCapabilities({
       appDisplayVersion: '1.0.0',
       appDisplayVersionDetail: '1.0.0-test',
-    },
+    }),
   });
 });
 

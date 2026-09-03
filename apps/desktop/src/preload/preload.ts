@@ -928,6 +928,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // capability snapshot(工作流 E):首帧同步;renderer 只消费布尔投影,
   // 不接触任何端点 URL(main 是能力与端点的唯一真相源)。
   appCapabilities: ipcRenderer.sendSync('app-capabilities:get-sync') as Record<string, boolean> | null,
+  onAppCapabilitiesChanged: (
+    cb: (capabilities: Record<string, boolean>) => void,
+  ) => {
+    const listener = (
+      _event: unknown,
+      capabilities: Record<string, boolean>,
+    ): void => cb(capabilities);
+    ipcRenderer.on('app-capabilities:changed', listener);
+    return () => {
+      ipcRenderer.removeListener('app-capabilities:changed', listener);
+    };
+  },
   windowBackdropMaterial: readWindowBackdropMaterialFromArgv(process.argv),
   onWindowBackdropMaterialChanged: (
     cb: (material: import('../shared/windowBackdrop').WindowsBackdropMaterial) => void,
@@ -1025,6 +1037,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // 任何路径参数。失败走 IPC 错误协议(reject,renderer 用 extractIpcError 解码)。
     importExternal: (): Promise<LocalThemeImportResult> =>
       ipcRenderer.invoke('local-themes:import') as Promise<LocalThemeImportResult>,
+  },
+
+  // 旧官方发行版数据显式导入(蓝图 §3.16):固定方法、无任意 channel;
+  // 路径授权在 main 侧重新校验(必须来自 discover 结果或候选目录形态)。
+  legacyImport: {
+    discover: (): Promise<import('../shared/legacyImport').LegacyImportDiscoveryResult> =>
+      ipcRenderer.invoke('legacy-import:discover'),
+    execute: (
+      filePaths: readonly string[],
+    ): Promise<import('../shared/legacyImport').LegacyImportExecuteResult> =>
+      ipcRenderer.invoke('legacy-import:execute', { filePaths } satisfies import('../shared/legacyImport').LegacyImportExecuteInput),
   },
 
   // RSB terminal tab(PTY 后端 + xterm.js)

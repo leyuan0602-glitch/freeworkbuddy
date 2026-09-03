@@ -20,8 +20,20 @@ interface MarketAccessUser {
   orgSlug: string | null;
 }
 
-/** 当前登录用户是否可见 Skill Hub 市场内容(null = 未登录,按不可见处理)。 */
-export function canAccessSkillhubMarket(user: MarketAccessUser | null): boolean {
+/** 当前登录用户是否可见 Skill Hub 市场内容(null = 未登录,按不可见处理)。
+ *
+ * 发行 capability 叠加(可选):skillhubApiBaseUrl 未部署时
+ * (canUseSkillHubCloud === false)市场整体不可见,本地技能管理不受影响。
+ */
+export interface SkillhubMarketCapabilityGates {
+  canUseSkillHubCloud?: boolean;
+}
+
+export function canAccessSkillhubMarket(
+  user: MarketAccessUser | null,
+  capabilities?: SkillhubMarketCapabilityGates,
+): boolean {
+  if (capabilities?.canUseSkillHubCloud === false) return false;
   if (!user || user.membershipKind !== 'org') return false;
   if (user.orgSlug !== null) return user.orgSlug === SKILLHUB_MARKET_ORG_SLUG;
   // 旧 token 无 orgSlug claim 的兜底:显示名全等匹配(大小写不敏感)。

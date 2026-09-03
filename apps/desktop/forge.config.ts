@@ -13,6 +13,7 @@ import { VitePlugin } from '@electron-forge/plugin-vite';
 import type { ForgeArch, ForgeConfig, ForgePlatform } from '@electron-forge/shared-types';
 import {
   allDeepLinkSchemes,
+  BRAND_IDENTITY,
   resolveCindyRegion,
   type BrandIdentity,
 } from '@cindy/maker-shared/brand-identity';
@@ -76,6 +77,19 @@ process.env.VITE_CINDY_DISTRIBUTION_MANIFEST_SOURCE = DISTRIBUTION_PROFILE.regio
 process.env.VITE_CINDY_DISTRIBUTION_CAPABILITIES = DISTRIBUTION_PROFILE.region
   ? ''
   : JSON.stringify(DISTRIBUTION_PROFILE.capabilityDefaults);
+// 品牌摘要(工作流 C):法律/支持/官网链接与展示名的发行层来源。官方留空
+// (renderer 法律链接走既有区域分流);消费单点:src/shared/brandRegion.ts →
+// CURRENT_DISTRIBUTION_BRAND → shared/legalLinks.ts。
+process.env.VITE_CINDY_DISTRIBUTION_BRAND = DISTRIBUTION_PROFILE.region
+  ? ''
+  : JSON.stringify({
+      productName: DISTRIBUTION_PROFILE.brand.productName,
+      companyName: DISTRIBUTION_PROFILE.brand.companyName,
+      privacyUrl: DISTRIBUTION_PROFILE.brand.privacyUrl,
+      termsUrl: DISTRIBUTION_PROFILE.brand.termsUrl,
+      websiteUrl: DISTRIBUTION_PROFILE.brand.websiteUrl ?? '',
+      supportUrl: DISTRIBUTION_PROFILE.brand.supportUrl ?? '',
+    });
 // 本构建的系统身份(官方路径 = BRAND_IDENTITY 原样,区域差异保留;独立发行 =
 // by-region 三键同值的派生 identity)。forge 侧与运行时消费全部经它取值。
 const BUILD_IDENTITY: BrandIdentity = DISTRIBUTION_PROFILE.region

@@ -3,6 +3,8 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { withAppCapabilities } from '../../../../test/vitest/appCapabilitiesTestBridge';
+
 import { CindyAuthClient, reduceAuthFlow, type AuthFlowState } from '@cindy/auth-client';
 import { createScenarioFetch } from '@cindy/auth-client/fixtures';
 
@@ -73,7 +75,12 @@ beforeEach(() => {
     configurable: true,
     // acceptPrivacyConsent:协议门放行时记录「已同意」(TapDB 采集的前置条件)。
     // fire-and-forget,不参与登录派发时序。
-    value: { platform: 'darwin', acceptPrivacyConsent: async () => ({ allowed: true }) },
+    value: withAppCapabilities({
+      platform: 'darwin',
+      // acceptPrivacyConsent:协议门放行时记录「已同意」(TapDB 采集的前置条件)。
+      // fire-and-forget,不参与登录派发时序。
+      acceptPrivacyConsent: async () => ({ allowed: true }),
+    }),
   });
 });
 

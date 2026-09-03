@@ -125,5 +125,39 @@ export const CURRENT_DISTRIBUTION_CAPABILITY_DEFAULTS: Readonly<Record<string, b
     return parsed as Record<string, boolean>;
   })();
 
+/**
+ * 发行品牌摘要(工作流 C):法律/支持/官网链接的发行层来源。
+ * 官方构建为 null(legalLinks 走既有区域分流);独立发行携带 profile 值。
+ */
+export interface DistributionBrandSummary {
+  productName: string;
+  companyName: string;
+  privacyUrl: string;
+  termsUrl: string;
+  websiteUrl: string;
+  supportUrl: string;
+}
+
+export const CURRENT_DISTRIBUTION_BRAND: DistributionBrandSummary | null = (() => {
+  const injected = import.meta.env?.VITE_CINDY_DISTRIBUTION_BRAND;
+  if (!injected) return null;
+  const parsed = JSON.parse(injected) as Partial<DistributionBrandSummary>;
+  if (
+    typeof parsed?.privacyUrl !== 'string'
+    || typeof parsed?.termsUrl !== 'string'
+    || typeof parsed?.productName !== 'string'
+  ) {
+    throw new Error('VITE_CINDY_DISTRIBUTION_BRAND: 注入的品牌摘要结构非法');
+  }
+  return {
+    productName: parsed.productName,
+    companyName: parsed.companyName ?? '',
+    privacyUrl: parsed.privacyUrl,
+    termsUrl: parsed.termsUrl,
+    websiteUrl: parsed.websiteUrl ?? '',
+    supportUrl: parsed.supportUrl ?? '',
+  };
+})();
+
 /** 本构建的系统身份 id(Windows AUMID / macOS bundle id)。 */
 export const CURRENT_APP_ID: string = CURRENT_BRAND_IDENTITY.appIdByRegion[CURRENT_CINDY_REGION];

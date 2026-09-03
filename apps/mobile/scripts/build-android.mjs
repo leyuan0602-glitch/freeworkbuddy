@@ -84,6 +84,9 @@ import {
   mobileClientBundleProcessEnv,
 } from '../../../scripts/shared/client-endpoint-build-env.mjs';
 import { SELF_HOST_REGIONS, loadSelfHostRegions, missingSelfHostBakeFields, stripSelfHostRegionEnv } from './lib/self-host-region.mjs';
+import distributionProfile from './lib/distribution-profile.cjs';
+
+const { resolveMobileDistribution } = distributionProfile;
 
 const MOBILE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const NPX = process.platform === 'win32' ? 'npx.cmd' : 'npx';
@@ -132,12 +135,18 @@ function reportAndroidBuildFailure() {
 }
 
 // self-host 变体的构建环境(与原发布线同源),注入 versionCode。
-function selfhostEnv(region, versionCode, desktopVersion) {
+function selfhostEnv(region, versionCode, desktopVersion, distribution) {
   const env = {
     ...mobileClientBundleProcessEnv({ authRegion: region.authRegion }),
     EXPO_PUBLIC_XDT_OTA_SELFHOST: '1',
     XDT_ANDROID_VERSION_CODE: String(versionCode),
   };
+  if (distribution.kind === 'selfhost') {
+    env.EXPO_PUBLIC_CINDY_AUTH_REGION = 'global';
+    env.EXPO_PUBLIC_ENDPOINT_MANIFEST_BASE_URL =
+      distribution.identity.endpointManifestBaseUrl;
+    env.EXPO_PUBLIC_ENDPOINT_MANIFEST_PEER_BASE_URL = '';
+  }
   // 防止本机 shell / 旧 .env 残留变量混入构建;真实地址只认 config/endpoint*.json。
   delete env.EXPO_PUBLIC_XDT_OTA_URL;
   // 二级版本号:仅显式传入时注入;构建脚本不做任何远端解析。
@@ -148,13 +157,20 @@ function selfhostEnv(region, versionCode, desktopVersion) {
 // 供 dry-run 展示的「本脚本注入的 baked 变量」——只从非 process.env 来源(region
 // JSON / endpoint 文件 / 字面量 / CLI 参数)构造,不把打包机 process.env(含 keystore
 // 口令等机密)引入日志(与 selfhostEnv 注入的同名值一致)。
-function bakedDisplayEnv(region, versionCode, desktopVersion) {
-  return {
+function bakedDisplayEnv(region, versionCode, desktopVersion, distribution) {
+  const env = {
     ...mobileClientBundleEnv({ authRegion: region.authRegion }),
     EXPO_PUBLIC_XDT_OTA_SELFHOST: '1',
     ...(desktopVersion ? { EXPO_PUBLIC_DESKTOP_VERSION: desktopVersion } : {}),
     XDT_ANDROID_VERSION_CODE: String(versionCode),
   };
+  if (distribution.kind === 'selfhost') {
+    env.EXPO_PUBLIC_CINDY_AUTH_REGION = 'global';
+    env.EXPO_PUBLIC_ENDPOINT_MANIFEST_BASE_URL =
+      distribution.identity.endpointManifestBaseUrl;
+    env.EXPO_PUBLIC_ENDPOINT_MANIFEST_PEER_BASE_URL = '';
+  }
+  return env;
 }
 
 function readAppJson() {
@@ -377,8 +393,13 @@ async function main() {
     throw new Error(`--region 只能是 ${SELF_HOST_REGIONS.join(' 或 ')},收到: ${rawRegion}`);
   }
   androidBuildFailureStage = ANDROID_BUILD_FAILURE_STAGE.regionConfig;
+  const distribution = resolveMobileDistribution(process.env);
   const region = loadSelfHostRegions({ mode: 'local' })[rawRegion];
-  if (!region.androidPackage?.trim()) {
+  const androidPackage =
+    distribution.kind === 'selfhost'
+      ? distribution.identity.androidPackage
+      : region.androidPackage?.trim();
+  if (!androidPackage) {
     throw new Error(`self-host-regions.json 的 ${region.authRegion}.androidPackage 未填(构建必需)`);
   }
   androidBuildFailureStage = ANDROID_BUILD_FAILURE_STAGE.buildPlan;
@@ -398,7 +419,8 @@ async function main() {
 
   // selfhost 烘焙必填字段(prebuild 期 app.config.js 硬校验)提前自查:dry-run 只预告,
   // --execute 在 prebuild 白跑数分钟之前 fail-fast。
-  const missingBake = missingSelfHostBakeFields(region);
+  const missingBake =
+    distribution.kind === 'selfhost' ? [] : missingSelfHostBakeFields(region);
 
   // git 闸门只管真构建:dry-run 纯本地(不做 origin/main 远端比对,分支/离线可跑)。
   let expectedUploadCertificateSha256 = null;
@@ -423,11 +445,11 @@ async function main() {
   }
 
   // env 必须在 versionCode 决定之后构建:经 XDT_ANDROID_VERSION_CODE 注入 prebuild。
-  const env = selfhostEnv(region, versionCode, desktopVersion);
+  const env = selfhostEnv(region, versionCode, desktopVersion, distribution);
 
   // 计划打印
   console.log('');
-  console.log(`target: Android 纯构建(region=${region.authRegion}, ${region.androidPackage})`);
+  console.log(`target: Android 纯构建(region=${region.authRegion}, ${androidPackage})`);
   console.log(`artifacts: ${artifactKinds.join(' + ')}${args.artifacts == null ? ' (按 region 默认)' : ' (--artifacts 覆盖)'}`);
   console.log(`version / versionCode: ${version} / ${versionCode}${args.versionCode != null ? ' (--version-code 覆盖)' : ' (取 android-version.json 现值)'}`);
   const suffix = String(region.authRegion).toUpperCase();
@@ -442,7 +464,7 @@ async function main() {
   if (missingBake.length) {
     console.log(`selfhost 必填缺失: ${missingBake.join(', ')}(--execute 前须在 self-host-regions.json 补齐;prebuild 期 app.config.js 硬校验)`);
   }
-  const display = bakedDisplayEnv(region, versionCode, desktopVersion);
+  const display = bakedDisplayEnv(region, versionCode, desktopVersion, distribution);
   for (const line of formatBakedEnvLines(display, { extraKeys: ['XDT_ANDROID_VERSION_CODE'] })) console.log(line);
   // 实际构建 env 从打包机 process.env 起步(微信 AppId 等公开配置本就由打包机 env 注入),
   // 计划里如实列出将一并烤入的继承键——只列键名不打值,不引机密入日志。
@@ -456,7 +478,12 @@ async function main() {
 
   androidBuildFailureStage = ANDROID_BUILD_FAILURE_STAGE.preflight;
   // region / endpoint manifest 自举基址必须齐全(读仓内 config/endpoint*.json,离线可用)。
-  assertPublicEnv(env, { variant: 'production', requiredKeys: SELF_HOST_PUBLIC_ENV_KEYS });
+  const requiredPublicEnvKeys = distribution.kind === 'selfhost'
+    ? SELF_HOST_PUBLIC_ENV_KEYS.filter(
+        (key) => key !== 'EXPO_PUBLIC_ENDPOINT_MANIFEST_PEER_BASE_URL',
+      )
+    : SELF_HOST_PUBLIC_ENV_KEYS;
+  assertPublicEnv(env, { variant: 'production', requiredKeys: requiredPublicEnvKeys });
 
   androidBuildFailureStage = ANDROID_BUILD_FAILURE_STAGE.toolchain;
   const built = buildAndroidArtifacts(env, region, artifactKinds);
@@ -469,7 +496,7 @@ async function main() {
   if (built.artifacts.apk) {
     runtimeVersions.apk = readEmbeddedRuntimeVersionFromApk(built.artifacts.apk);
     log(`  ✓ runtimeVersion(APK assets/fingerprint): ${runtimeVersions.apk}`);
-    validateApkMetadata(built.artifacts.apk, region.androidPackage, versionCode);
+    validateApkMetadata(built.artifacts.apk, androidPackage, versionCode);
   }
   if (built.artifacts.aab) {
     runtimeVersions.aab = readEmbeddedRuntimeVersionFromAab(built.artifacts.aab);
@@ -477,7 +504,7 @@ async function main() {
     validateAabMetadata(
       built.artifacts.aab,
       built.androidDir,
-      region.androidPackage,
+      androidPackage,
       versionCode,
       version,
     );

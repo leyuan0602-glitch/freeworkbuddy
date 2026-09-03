@@ -47,6 +47,7 @@ import {
 import { toast } from '@/lib/toast';
 import { extractIpcError } from '@/utils/ipcError';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAppCapabilities } from '@/hooks/useAppCapabilities';
 import { useInstalledGhosts } from '@/cindy-brain/useInstalledGhosts';
 import { NEW_MAKER_DRAFT_KEY } from '@/features/cc-agent/newMakerDraftKeys';
 import {
@@ -395,6 +396,10 @@ export function GhostPluginPage({
     [t],
   );
   const { user, mode, dataOwnerId } = useAuth();
+  // 发行 capability 投影(工作流 E):pluginApiBaseUrl 未部署时(canUsePluginMarket
+  // === false)推荐区/市场区块整体不渲染;本地已装插件管理不受影响(蓝图 §2.5)。
+  const distributionCapabilities = useAppCapabilities();
+  const canUsePluginMarket = distributionCapabilities.canUsePluginMarket !== false;
   const showEnterprise = user?.membershipKind === 'org';
   const ghosts = useInstalledGhosts();
   useMainViewVisibilityRevision();
@@ -1697,10 +1702,11 @@ export function GhostPluginPage({
               ) : null}
             </section>
 
-            {availableMarketItems.length > 0 ||
-            searchedAvailableMarketItems.length > 0 ||
-            marketSnapshot?.unavailableReason ||
-            marketSnapshot?.unavailableCustomSourceNames.length ? (
+            {(canUsePluginMarket &&
+              (availableMarketItems.length > 0 ||
+              searchedAvailableMarketItems.length > 0 ||
+              marketSnapshot?.unavailableReason ||
+              marketSnapshot?.unavailableCustomSourceNames.length)) ? (
               <section className="plugin-motion-page-section mt-10 min-w-0">
                 <div className={PLUGIN_CATALOG_TOOLBAR_CLASS}>
                   {/* 推荐区标题不带数字(设计定稿):数量感由卡片自身传达。 */}

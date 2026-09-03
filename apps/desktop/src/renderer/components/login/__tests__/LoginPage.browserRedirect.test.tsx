@@ -3,6 +3,8 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { withAppCapabilities } from '../../../../test/vitest/appCapabilitiesTestBridge';
+
 const loginHook = vi.hoisted(() => ({
   dispatch: vi.fn(),
   dispatchWithResult: vi.fn(),
@@ -66,7 +68,7 @@ describe('LoginPage browser redirect waiting state', () => {
     };
     Object.defineProperty(window, 'electronAPI', {
       configurable: true,
-      value: { platform: 'darwin' },
+      value: withAppCapabilities({ platform: 'darwin' }),
     });
   });
 

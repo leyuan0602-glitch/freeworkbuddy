@@ -3,6 +3,8 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { withAppCapabilities } from '../../../test/vitest/appCapabilitiesTestBridge';
+
 /**
  * LoginHandoff 衔接动画测试(implementation-plan Step 3b WHAT2/WHAT3)。
  *
@@ -78,7 +80,6 @@ import { LoginBrandStage } from '@/components/login/LoginBrandStage';
 import { SplashScreen } from '@/components/splash/SplashScreen';
 import { LoginPage } from '@/components/login/LoginPage';
 import {
-  brandPlacement,
   panelPlacement,
   splashBrandPlacement,
 } from '@/components/login/loginScale';
@@ -121,10 +122,10 @@ beforeEach(() => {
     svc.authListener = cb;
     return () => {};
   });
-  (window as unknown as { electronAPI: unknown }).electronAPI = {
+  (window as unknown as { electronAPI: unknown }).electronAPI = withAppCapabilities({
     platform: 'darwin',
     onAuthSessionExpired: () => () => {},
-  };
+  });
 });
 
 afterEach(() => {

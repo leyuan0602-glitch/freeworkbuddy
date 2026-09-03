@@ -10,6 +10,15 @@ export interface UsageSettingsIdentity {
   mode: 'signed-out' | 'local' | 'cloud';
 }
 
-export function canAccessUsageSettings(identity: UsageSettingsIdentity): boolean {
+/** 发行 capability 投影(可选):usage 读托管模型的用量,未部署即隐藏。 */
+export interface UsageCapabilityGates {
+  canUseManagedModels?: boolean;
+}
+
+export function canAccessUsageSettings(
+  identity: UsageSettingsIdentity,
+  capabilities?: UsageCapabilityGates,
+): boolean {
+  if (capabilities?.canUseManagedModels === false) return false;
   return identity.mode !== 'signed-out';
 }

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CindyAuthClient, reduceAuthFlow, type AuthFlowState } from '@cindy/auth-client';
 import { createScenarioFetch } from '@cindy/auth-client/fixtures';
+import { withAppCapabilities } from '../../../../test/vitest/appCapabilitiesTestBridge';
 
 /**
  * Global(国际区)构建变体的登录皮回归。
@@ -44,6 +45,7 @@ vi.mock('react-i18next', () => ({
 vi.mock('../../../../shared/brandRegion', () => ({
   CURRENT_CINDY_REGION: 'global',
   CURRENT_APP_ID: 'com.xd.cindy',
+  CURRENT_DISTRIBUTION_BRAND: null,
 }));
 vi.mock('@/hooks/useLogin', () => ({ useLogin: () => loginHook.value }));
 vi.mock('@/components/title-bar/WindowControls', () => ({ WindowControls: () => null }));
@@ -95,7 +97,7 @@ beforeEach(() => {
   acceptPrivacyConsent.mockClear();
   Object.defineProperty(window, 'electronAPI', {
     configurable: true,
-    value: { platform: 'darwin', openExternal, acceptPrivacyConsent },
+    value: withAppCapabilities({ platform: 'darwin', openExternal, acceptPrivacyConsent }),
   });
 });
 

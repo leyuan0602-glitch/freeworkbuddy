@@ -3,6 +3,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { withAppCapabilities } from '../../../../test/vitest/appCapabilitiesTestBridge';
+
 const loginHook = vi.hoisted(() => ({
   value: {
     isLoading: false,
@@ -57,7 +59,7 @@ describe('LoginPage account deletion status', () => {
     loginHook.value.clearAccountDeletionReceipt = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(window, 'electronAPI', {
       configurable: true,
-      value: { platform: 'darwin' },
+      value: withAppCapabilities({ platform: 'darwin' }),
     });
   });
 

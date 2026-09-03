@@ -27,6 +27,7 @@ import { setLoginEmailCaptchaGate } from '@/lib/loginCaptchaGate';
 import { WindowControls } from '@/components/title-bar/WindowControls';
 import { ChromeIconButton } from '@/components/title-bar/ChromeIconButton';
 import { useLogin } from '@/hooks/useLogin';
+import { useAppCapabilities } from '@/hooks/useAppCapabilities';
 import { endLoginFirstLaunchLightGate, loginFirstLaunchLightActive } from '@/hooks/useTheme';
 import { LOGIN_HANDOFF_TIMINGS, useLoginHandoff } from '@/contexts/LoginHandoffContext';
 
@@ -143,6 +144,11 @@ export function LoginPage({
   } = useLogin();
   const { t } = useTranslation();
   const handoff = useLoginHandoff();
+  // 发行 capability 投影(工作流 E):authApiBaseUrl 未部署(canUseAccount ===
+  // false)时登录页只保留标题与「本地模式」入口,账号登录流程整体不渲染
+  // (蓝图 §2.5;Local-first 首启不等待 auth,main 侧 auth client 不初始化)。
+  const distributionCapabilities = useAppCapabilities();
+  const canUseAccount = distributionCapabilities.canUseAccount !== false;
   const isAddAccount = intent === 'add-account';
   const accountSwitcherTriggerRef = useRef<HTMLButtonElement>(null);
   const [accountSwitcherOpen, setAccountSwitcherOpen] = useState(false);
@@ -1296,6 +1302,23 @@ export function LoginPage({
   const { node, ssoOrgGroupY } = renderContent();
   if (loginState?.step === 'completed') return null;
 
+  // Local-only 面板:auth 未部署时替代整个账号登录流。本地模式入口与正式
+  // 登录页同款(协议同意门照走,见 openLocalMode 注释)。
+  const localOnlyNode = canUseAccount ? null : (
+    <LoginPanel testId="login-panel-local-only">
+      <LoginTitleBlock title={t('login.title')} subtitle={t('login.subtitle')} />
+      <LoginSkipEntry
+        testId="login-skip-entry"
+        disabled={isLoading || localModePending}
+        onClick={() =>
+          requireConsent(() => void openLocalMode(), { deferConsentPersist: true })
+        }
+      >
+        {t('login.localModeEntry')}
+      </LoginSkipEntry>
+    </LoginPanel>
+  );
+
   // handoff 面板入场(demo 步骤 4:opacity 0→1 + 自下而上 20px,420ms
   // cubic-bezier(.35,.1,.25,1));panelRevealed 前完全隐藏且不吃点击,
   // 播放期外(回访 /login、无 Provider 单测)直落终态无过渡。
@@ -1368,7 +1391,7 @@ export function LoginPage({
         footer={loginFooter}
         bottomReserve={panelBottomReserve}
       >
-        {node}
+        {canUseAccount ? node : localOnlyNode}
       </LoginStage>
       {accountSwitcherOpen ? (
         <Suspense fallback={null}>

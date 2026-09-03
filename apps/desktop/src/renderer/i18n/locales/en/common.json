@@ -1241,6 +1241,31 @@
         }
       }
     },
+    "legacyImport": {
+      "title": "Import from the official app",
+      "description": "Read-only scan of the official Cindy app data on this machine. Only databases you select are imported; scanning and importing never modify or delete legacy data, and a failed import leaves it untouched.",
+      "scan": "Scan legacy data",
+      "scanning": "Scanning",
+      "empty": "No legacy data found",
+      "emptyHint": "No session databases from the official app were found on this machine. If the official app was used under another OS user account, switch to that account and scan again.",
+      "userDb": "Task database of user {{userId}}",
+      "warnings": "{{count}} more files were skipped (hover for reasons)",
+      "credentialsNote": "Login credentials and model API keys are not imported. Sign in again and re-enter your model keys after importing.",
+      "importSelected": "Import selected ({{count}})",
+      "importing": "Importing",
+      "resultOk": "Imported {{sessions}} tasks and {{messages}} messages; skipped {{skipped}} existing items",
+      "resultFailed": "Import failed ({{kind}}). Nothing was written; legacy data remains untouched.",
+      "droppedColumns": "{{count}} legacy-only fields ignored",
+      "messagesTableMissing": "No message data in this legacy database",
+      "resultFooter": "Import is idempotent: running it again on the same database does not duplicate content.",
+      "kind": {
+        "corrupt-db": "File is corrupted or not a valid database",
+        "no-such-table": "Table schema is incompatible",
+        "txn-failed": "Write failed",
+        "budget-exceeded": "Row count exceeds the per-import budget",
+        "rejected": "Path is outside the allowed set"
+      }
+    },
     "sessionImport": {
       "title": "Local Session Import",
       "description": "Read-only scan of local Claude Code and Codex history. Only checked sessions in the list will be imported; skipped internal sessions are hidden and cannot be imported.",

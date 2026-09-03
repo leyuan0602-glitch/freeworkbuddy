@@ -156,7 +156,7 @@ describe('resolveDistributionProfile(构建期 env 选取)', () => {
     expect(() => resolveDistributionProfile('CINDY-GLOBAL', null)).toThrow(/Unknown distribution profile/);
   });
 
-  it('FreeWorkBuddy self-host profile:owner 决策值锁定(蓝图 §3.21)', () => {
+  it('FreeWorkBuddy self-host profile:联网部署启用 auth/device-link，其余云能力关闭', () => {
     expect(SELFHOST_FREEWORKBUDDY_PROFILE).toMatchObject({
       distributionId: 'freeworkbuddy-selfhost',
       authRealm: 'global',
@@ -173,12 +173,23 @@ describe('resolveDistributionProfile(构建期 env 选取)', () => {
       secureStorageNamespace: 'freeworkbuddy',
     });
     expect(SELFHOST_FREEWORKBUDDY_PROFILE.endpointManifest).toMatchObject({
-      mode: 'embedded',
+      mode: 'remote',
+      bootstrapUrl: 'https://freeworkbuddy.me/endpoint.json',
       trustedEndpointDomains: ['freeworkbuddy.me'],
     });
-    for (const key of DISTRIBUTION_CAPABILITY_KEYS) {
-      expect(SELFHOST_FREEWORKBUDDY_PROFILE.capabilityDefaults[key]).toBe(false);
-    }
+    expect(SELFHOST_FREEWORKBUDDY_PROFILE.capabilityDefaults).toMatchObject({
+      canUseAccount: true,
+      canUseDeviceLink: true,
+      canOpenWebsite: true,
+      canUseManagedModels: false,
+      canUseManagedVoice: false,
+      canUseOAuthBroker: false,
+      canUseSkillHubCloud: false,
+      canUsePluginMarket: false,
+      canPublishPlugins: false,
+      canSendTelemetry: false,
+      canCheckDesktopUpdates: false,
+    });
   });
 });
 

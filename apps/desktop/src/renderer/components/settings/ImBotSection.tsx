@@ -38,6 +38,7 @@ import {
   showTelegramBot,
   type ImBotIdentity,
 } from './imBotVisibility';
+import { useAppCapabilities } from '@/hooks/useAppCapabilities';
 
 /** 「IM 机器人」页面分区 id(与 ?imGroup= 参数共用)。 */
 export type ImBotSettingsGroup = 'cindy' | 'personal';
@@ -117,12 +118,15 @@ function PersonalGroupContent({
 export function ImBotSection({ targetGroup }: { targetGroup: ImBotSettingsGroup | null }) {
   const { t } = useTranslation();
   const { mode, dataOwnerId, user } = useAuth();
+  // 托管 hook 渠道受发行 capability 闸控:三个托管 endpoint 全部未部署时,
+  // 「Cindy」分栏整体隐藏(个人 bot 分栏不受影响,蓝图 §2.5)。
+  const capabilities = useAppCapabilities();
   const identity: ImBotIdentity = {
     region: CURRENT_CINDY_REGION,
     mode,
     membershipKind: user?.membershipKind ?? null,
   };
-  const cindyGroupAvailable = showCindyGroup(identity);
+  const cindyGroupAvailable = showCindyGroup(identity, capabilities);
   const discordVisible = showDiscordBot(identity);
   const larkVisible = showLarkBot(identity);
   const telegramVisible = showTelegramBot(identity);

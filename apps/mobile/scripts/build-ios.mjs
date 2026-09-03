@@ -67,6 +67,9 @@ import {
   mobileClientBundleProcessEnv,
 } from '../../../scripts/shared/client-endpoint-build-env.mjs';
 import { SELF_HOST_REGIONS, loadSelfHostRegions, missingSelfHostBakeFields, stripSelfHostRegionEnv } from './lib/self-host-region.mjs';
+import distributionProfile from './lib/distribution-profile.cjs';
+
+const { resolveMobileDistribution } = distributionProfile;
 
 const MOBILE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const NPX = process.platform === 'win32' ? 'npx.cmd' : 'npx';
@@ -115,11 +118,17 @@ function reportIosBuildFailure() {
 }
 
 // self-host 变体的构建环境(与原发布线同源:prebuild/fingerprint 与安装包一致)。
-function selfhostEnv(region, desktopVersion) {
+function selfhostEnv(region, desktopVersion, distribution) {
   const env = {
     ...mobileClientBundleProcessEnv({ authRegion: region.authRegion }),
     EXPO_PUBLIC_XDT_OTA_SELFHOST: '1',
   };
+  if (distribution.kind === 'selfhost') {
+    env.EXPO_PUBLIC_CINDY_AUTH_REGION = 'global';
+    env.EXPO_PUBLIC_ENDPOINT_MANIFEST_BASE_URL =
+      distribution.identity.endpointManifestBaseUrl;
+    env.EXPO_PUBLIC_ENDPOINT_MANIFEST_PEER_BASE_URL = '';
+  }
   // 防止本机 shell / 旧 .env 残留变量混入构建;真实地址只认 config/endpoint*.json。
   delete env.EXPO_PUBLIC_XDT_OTA_URL;
   // 二级版本号:仅显式传入时注入(空则设置页不显示该行);构建脚本不做任何远端解析。
@@ -130,12 +139,19 @@ function selfhostEnv(region, desktopVersion) {
 // 供 dry-run 展示的「本脚本注入的 baked 变量」——只从非 process.env 来源(region
 // JSON / endpoint 文件 / 字面量 / CLI 参数)构造,不把打包机 process.env(含 keystore
 // 口令等机密)引入日志(与 selfhostEnv 注入的同名值一致)。
-function bakedDisplayEnv(region, desktopVersion) {
-  return {
+function bakedDisplayEnv(region, desktopVersion, distribution) {
+  const env = {
     ...mobileClientBundleEnv({ authRegion: region.authRegion }),
     EXPO_PUBLIC_XDT_OTA_SELFHOST: '1',
     ...(desktopVersion ? { EXPO_PUBLIC_DESKTOP_VERSION: desktopVersion } : {}),
   };
+  if (distribution.kind === 'selfhost') {
+    env.EXPO_PUBLIC_CINDY_AUTH_REGION = 'global';
+    env.EXPO_PUBLIC_ENDPOINT_MANIFEST_BASE_URL =
+      distribution.identity.endpointManifestBaseUrl;
+    env.EXPO_PUBLIC_ENDPOINT_MANIFEST_PEER_BASE_URL = '';
+  }
+  return env;
 }
 
 function readAppJson() {
@@ -168,7 +184,7 @@ function run(cmd, args, opts = {}) {
   if (r.status !== 0) throw new Error(`命令失败(${r.status}): ${cmd} ${args.join(' ')}`);
 }
 
-function buildIpa(env, region) {
+function buildIpa(env, region, iosBundleId) {
   // 签名参数(非机密描述符)由 region JSON 提供,构建时强制解析。
   const sign = resolveIosSigningEnv(region);
   run(NPX, ['--yes', 'expo', 'prebuild', '--platform', 'ios', '--clean'], { env });
@@ -184,7 +200,7 @@ function buildIpa(env, region) {
   const plistPath = join(outDir, 'ExportOptions.plist');
   writeFileSync(plistPath, buildExportOptionsPlist({
     teamId: sign.teamId,
-    bundleId: region.iosBundleId,
+    bundleId: iosBundleId,
     profileName: sign.profileName,
     // 与 archive 的 CODE_SIGN_IDENTITY 同一张证书:避免钥匙串多证书时 export 自选到 profile 外的那张。
     signingCertificate: sign.identity,
@@ -231,20 +247,26 @@ async function main() {
     throw new Error(`--region 只能是 ${SELF_HOST_REGIONS.join(' 或 ')},收到: ${rawRegion}`);
   }
   iosBuildFailureStage = IOS_BUILD_FAILURE_STAGE.regionConfig;
+  const distribution = resolveMobileDistribution(process.env);
   const region = loadSelfHostRegions({ mode: 'local' })[rawRegion];
-  if (!region.iosBundleId?.trim()) {
+  const iosBundleId =
+    distribution.kind === 'selfhost'
+      ? distribution.identity.iosBundleIdentifier
+      : region.iosBundleId?.trim();
+  if (!iosBundleId) {
     throw new Error(`self-host-regions.json 的 ${region.authRegion}.iosBundleId 未填(构建必需)`);
   }
   iosBuildFailureStage = IOS_BUILD_FAILURE_STAGE.buildPlan;
   const desktopVersion = typeof args.desktopVersion === 'string' ? args.desktopVersion : '';
-  const env = selfhostEnv(region, desktopVersion);
+  const env = selfhostEnv(region, desktopVersion, distribution);
   const appJson = readAppJson();
   const version = appJson?.expo?.version ?? '';
   const buildNumber = appJson?.expo?.ios?.buildNumber ?? '';
 
   // selfhost 烘焙必填字段(prebuild 期 app.config.js 硬校验)提前自查:dry-run 只预告,
   // --execute 在 prebuild 白跑数分钟之前 fail-fast。
-  const missingBake = missingSelfHostBakeFields(region);
+  const missingBake =
+    distribution.kind === 'selfhost' ? [] : missingSelfHostBakeFields(region);
 
   // git 闸门只管真构建:dry-run 纯本地(不做 origin/main 远端比对,分支/离线可跑)。
   if (args.execute) {
@@ -263,7 +285,7 @@ async function main() {
 
   // 计划打印
   console.log('');
-  console.log(`target: iOS 纯构建(region=${region.authRegion}, ${region.iosBundleId})`);
+  console.log(`target: iOS 纯构建(region=${region.authRegion}, ${iosBundleId})`);
   console.log(`version / buildNumber: ${version} / ${buildNumber || '(app.json 未填)'}(取 app.json 现值,构建脚本不做版本决策)`);
   const sPreview = (name, value) => value?.trim() || `(${region.authRegion}.iosSigning.${name} 未填,--execute 时必填)`;
   const iosS = region.iosSigning ?? {};
@@ -272,7 +294,7 @@ async function main() {
   if (missingBake.length) {
     console.log(`selfhost 必填缺失: ${missingBake.join(', ')}(--execute 前须在 self-host-regions.json 补齐;prebuild 期 app.config.js 硬校验)`);
   }
-  const display = bakedDisplayEnv(region, desktopVersion);
+  const display = bakedDisplayEnv(region, desktopVersion, distribution);
   for (const line of formatBakedEnvLines(display)) console.log(line);
   // 实际构建 env 从打包机 process.env 起步(微信 AppId 等公开配置本就由打包机 env 注入),
   // 计划里如实列出将一并烤入的继承键——只列键名不打值,不引机密入日志。
@@ -288,10 +310,15 @@ async function main() {
   if (process.platform !== 'darwin') throw new Error('--execute 需在 macOS 上运行(xcodebuild)');
 
   // region / endpoint manifest 自举基址必须齐全(读仓内 config/endpoint*.json,离线可用)。
-  assertPublicEnv(env, { variant: 'production', requiredKeys: SELF_HOST_PUBLIC_ENV_KEYS });
+  const requiredPublicEnvKeys = distribution.kind === 'selfhost'
+    ? SELF_HOST_PUBLIC_ENV_KEYS.filter(
+        (key) => key !== 'EXPO_PUBLIC_ENDPOINT_MANIFEST_PEER_BASE_URL',
+      )
+    : SELF_HOST_PUBLIC_ENV_KEYS;
+  assertPublicEnv(env, { variant: 'production', requiredKeys: requiredPublicEnvKeys });
 
   iosBuildFailureStage = IOS_BUILD_FAILURE_STAGE.toolchain;
-  const ipaPath = buildIpa(env, region);
+  const ipaPath = buildIpa(env, region, iosBundleId);
   log(`  ✓ ipa: ${ipaPath}`);
 
   iosBuildFailureStage = IOS_BUILD_FAILURE_STAGE.artifactValidation;

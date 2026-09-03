@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CindyAuthClient, reduceAuthFlow, type AuthFlowState } from '@cindy/auth-client';
 import { createScenarioFetch } from '@cindy/auth-client/fixtures';
+import { withAppCapabilities } from '../../../../test/vitest/appCapabilitiesTestBridge';
 
 /**
  * 区域徽标(标题旁品牌红胶囊)的区域映射单测。
@@ -42,6 +43,7 @@ vi.mock('../../../../shared/brandRegion', () => ({
     return regionMock.region;
   },
   CURRENT_APP_ID: 'com.xd.cindy',
+  CURRENT_DISTRIBUTION_BRAND: null,
 }));
 vi.mock('@/hooks/useLogin', () => ({ useLogin: () => loginHook.value }));
 vi.mock('@/components/title-bar/WindowControls', () => ({ WindowControls: () => null }));
@@ -80,7 +82,7 @@ beforeEach(() => {
   regionMock.region = 'cn';
   Object.defineProperty(window, 'electronAPI', {
     configurable: true,
-    value: { platform: 'darwin', acceptPrivacyConsent: async () => ({ allowed: true }) },
+    value: withAppCapabilities({ platform: 'darwin', acceptPrivacyConsent: async () => ({ allowed: true }) }),
   });
 });
 

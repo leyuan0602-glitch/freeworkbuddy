@@ -466,7 +466,7 @@ describe('BillingPage remote catalog rendering', () => {
         subscriptionId: 'subscription_fixture',
         status: 'ACTIVE' as const,
         currentPeriodStartAt: '2026-07-01T00:00:00.000Z',
-        currentPeriodEndAt: '2026-08-01T00:00:00.000Z',
+        currentPeriodEndAt: '2026-08-01T12:00:00.000Z',
         entitlementValidUntil: '2026-08-02T00:00:00.000Z',
         cancelAtPeriodEnd: false,
         effectivePlan: {
@@ -1993,7 +1993,7 @@ describe('BillingPage plan change', () => {
     const billing = install(billingMocks());
     billing.cancelCurrentSubscription.mockResolvedValue({
       ...activeSubscription(),
-      currentPeriodEndAt: '2026-09-01T00:00:00.000Z',
+      currentPeriodEndAt: '2026-09-01T12:00:00.000Z',
       cancelAtPeriodEnd: true,
     });
     uiMocks.confirm.mockResolvedValueOnce(true);

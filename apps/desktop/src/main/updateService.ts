@@ -69,6 +69,8 @@ import { abortIOSSimulatorOperationsForExit } from './mcp-integrations/ios-simul
 import { getGhostNodeRuntimeBroker } from './cindy-brain/index';
 import { cleanOldUpdateFiles } from './updateArtifacts';
 
+import { CURRENT_DISTRIBUTION_MANIFEST_SOURCE } from '../shared/brandRegion';
+
 const log = createLogger('updateService');
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -1869,6 +1871,14 @@ async function executeRelaunchUnguarded(theme: 'light' | 'dark'): Promise<void> 
 // ── Public API ─────────────────────────────────────────────────────────────
 
 export function initUpdateService(): void {
+  // 工作流 E(蓝图 §2.5):updateMode 非 official(独立发行/手动模式)时不初始化
+  // updater —— 不注册 IPC、不排程检查、不碰 cdnBaseUrl(embedded 清单里为空)。
+  // temp 目录清理无网络副作用,保留。
+  if (CURRENT_DISTRIBUTION_MANIFEST_SOURCE !== null) {
+    log.info('update service disabled: distribution updateMode is not official');
+    sweepStaleUpdateTempDirs();
+    return;
+  }
   // Best-effort cleanup of >7-day-old `cindy-update*`/`xdt-update*` leftovers in %TEMP%.
   // Counterpart to the Rust updater's own sweep — covers the case where the
   // user stays on the latest version and never triggers another updater run.

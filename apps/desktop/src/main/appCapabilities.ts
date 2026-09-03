@@ -25,8 +25,9 @@ import {
   CURRENT_DISTRIBUTION_CAPABILITY_DEFAULTS,
 } from '../shared/brandRegion';
 import { getResolvedClientEndpoints } from './clientEndpointsService';
-import { ipcMain } from 'electron';
+import { ipcMain, BrowserWindow } from 'electron';
 import { throwIpcError } from './utils/ipcValidate.js';
+import { onAuthStateChange } from './authManager';
 import type { ClientEndpointKey, ClientEndpointMap } from '@cindy/maker-shared/client-endpoints';
 
 export interface AppCapabilities {
@@ -192,6 +193,8 @@ export function getDistributionCapabilitySnapshot(): DistributionCapabilitySnaps
 
 /** renderer 首帧同步读取 capability snapshot(preload 模块级 sendSync)。 */
 export const APP_CAPABILITIES_SYNC_CHANNEL = 'app-capabilities:get-sync';
+/** 会话/端点状态变化后向全部窗口推送的快照更新。 */
+export const APP_CAPABILITIES_CHANGED_CHANNEL = 'app-capabilities:changed';
 
 /** 必须在 createWindow() 前注册(与 registerClientEndpointsIpc 同一启动序)。 */
 export function registerAppCapabilitiesIpc(): void {
@@ -200,13 +203,36 @@ export function registerAppCapabilitiesIpc(): void {
   });
 }
 
+/**
+ * 向全部窗口广播最新快照。蓝图 §3.6:renderer 只消费只读投影,
+ * 变化由 main 主动推(session 切换 → 端点/登录维度变化)。
+ */
+export function pushCapabilitySnapshotToWindows(): void {
+  const snapshot = getDistributionCapabilitySnapshot();
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      win.webContents.send(APP_CAPABILITIES_CHANGED_CHANNEL, snapshot);
+    }
+  }
+}
+
+/**
+ * 安装快照广播器:订阅 auth 状态变化(authManager 是 session 真相源),
+ * 每次状态流转后重算并推送。必须在 authManager 可用后调用。
+ */
+export function installCapabilitySnapshotBroadcaster(): void {
+  onAuthStateChange(() => pushCapabilitySnapshotToWindows());
+}
+
 export function requireAppCapability(
   capability: keyof AppCapabilities,
   message = 'This feature requires a Cindy account.',
 ): void {
-  const session = getActiveAppSession();
   const boundaryPending = isAppSessionBoundaryPending();
-  if (deriveAppCapabilities(session.mode, boundaryPending)[capability]) return;
+  // Main is the enforcement boundary. The legacy six-key projection returned
+  // here already includes session, distribution-policy, and endpoint checks;
+  // using deriveAppCapabilities directly would silently bypass the latter two.
+  if (getAppCapabilities()[capability]) return;
   if (boundaryPending) {
     throwIpcError(
       'PRECONDITION_FAILED',
